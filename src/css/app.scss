@@ -1,1 +1,57 @@
+@use "sass:color";
+
 // app global css in SCSS form
+
+// Custom variables
+$primary: #4CAF50;
+$secondary: #8BC34A;
+$accent: #FFC107;
+$dark: #1E3A1E;
+
+// Animations
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+// Global styles
+body {
+  background-color: #f5f7fa;
+}
+
+.q-header, .q-footer {
+    background: linear-gradient(145deg, $primary, color.adjust($primary, $lightness: -10%));
+
+}
+
+.text-accent {
+  color: $accent;
+}
+
+.bg-dark {
+  background: $dark;
+}
+
+// Custom scrollbar
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba($primary, 0.5);
+  border-radius: 10px;
+  
+  &:hover {
+    background: rgba($primary, 0.7);
+  }
+}
