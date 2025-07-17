@@ -92,7 +92,7 @@
             </q-item-section>
           </q-item>
 
-          <q-item clickable v-ripple to="/reports" class="text-white">
+          <q-item clickable v-ripple to="/users" class="text-white">
             <q-item-section avatar>
               <q-icon name="assessment" color="blue-3" />
             </q-item-section>
@@ -101,12 +101,12 @@
             </q-item-section>
           </q-item>
 
-          <q-item clickable v-ripple to="/users" class="text-white">
+          <q-item clickable v-ripple to="/workers" class="text-white">
             <q-item-section avatar>
               <q-icon name="group" color="teal-3" />
             </q-item-section>
             <q-item-section>
-              <div class="text-weight-medium">Trabalhadores</div>
+              <div class="text-weight-medium">Funcionarios</div>
             </q-item-section>
             <q-item-section side>
               <q-badge color="teal" label="5" rounded />
