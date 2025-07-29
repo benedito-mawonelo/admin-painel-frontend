@@ -31,7 +31,7 @@
 
           <q-btn round flat class="glow-avatar">
             <q-avatar size="36px">
-              <img src="https://cdn.quasar.dev/img/avatar3.jpg">
+              <img :src="user?.avatar || 'https://cdn.quasar.dev/img/avatar3.jpg'" />
             </q-avatar>
             <q-menu anchor="bottom right" self="top right" class="shadow-5">
               <q-list style="min-width: 180px" class="text-dark">
@@ -48,7 +48,7 @@
                   <q-item-section>Configurações</q-item-section>
                 </q-item>
                 <q-separator />
-                <q-item clickable v-close-popup class="text-dark">
+                <q-item clickable v-close-popup class="text-dark" @click="logout">
                   <q-item-section avatar>
                     <q-icon name="logout" color="negative" />
                   </q-item-section>
@@ -71,9 +71,9 @@
       <q-scroll-area class="fit">
         <div class="q-pa-md text-center q-mb-md">
           <q-avatar size="70px" class="q-mb-sm">
-            <img src="https://cdn.quasar.dev/img/avatar3.jpg">
+            <img :src="user?.avatar || 'https://cdn.quasar.dev/img/avatar3.jpg'" />
           </q-avatar>
-          <div class="text-h6 text-weight-medium">Olá, Admin</div>
+          <div class="text-h6 text-weight-medium">Olá, {{ user?.name || 'Usuário' }}</div>
           <div class="text-caption text-grey-5">Bem-vindo de volta</div>
         </div>
 
@@ -106,7 +106,7 @@
               <q-icon name="group" color="teal-3" />
             </q-item-section>
             <q-item-section>
-              <div class="text-weight-medium">Funcionarios</div>
+              <div class="text-weight-medium">Funcionários</div>
             </q-item-section>
             <q-item-section side>
               <q-badge color="teal" label="5" rounded />
@@ -170,34 +170,65 @@
 <script>
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
+import { api } from 'boot/axios'
 
 export default {
-  setup () {
+  setup() {
     const $q = useQuasar()
+    const router = useRouter()
     const leftDrawerOpen = ref(false)
+    const user = ref(null)
+
+    // Carregar informações do usuário autenticado
+    const loadUser = async () => {
+      try {
+        const response = await api.get('/users/me/') // Assumindo que existe um endpoint para obter o usuário atual
+        user.value = response.data
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error)
+        localStorage.removeItem('auth_token')
+        router.push('/login')
+      }
+    }
+
+    // Verificar se o usuário está autenticado
+    if (localStorage.getItem('auth_token')) {
+      loadUser()
+    }
 
     const toggleDarkMode = () => {
       $q.dark.toggle()
     }
 
+    const logout = () => {
+      localStorage.removeItem('auth_token')
+      router.push('/login')
+      $q.notify({
+        type: 'positive',
+        message: 'Logout realizado com sucesso!'
+      })
+    }
+
     return {
       leftDrawerOpen,
-      toggleDarkMode
+      user,
+      toggleDarkMode,
+      logout
     }
   }
 }
 </script>
 
 <style lang="scss">
-
-
 .menu-list {
   .q-item {
     border-radius: 8px;
     margin: 4px 8px;
     transition: all 0.3s ease;
 
-    &.q-router-link--active, &:hover {
+    &.q-router-link--active,
+    &:hover {
       background: rgba(255, 255, 255, 0.1);
       transform: translateX(4px);
 
@@ -240,7 +271,6 @@ export default {
   background: #f5f7fa;
 }
 
-// Dark mode styles
 .body--dark {
   .q-page-container {
     background: #121212;

@@ -472,8 +472,9 @@
   </q-page>
 </template>
 
+
 <script>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { api } from 'boot/axios'
 import { useQuasar } from 'quasar'
 import { date } from 'quasar'
@@ -516,16 +517,140 @@ export default {
       'ganha-facil', 'videos-practical-pesado', 'profissional', 'videos', 'ligeiro_pesado', 'videos-practical-ligeiro'
     ]
 
-
-
-    const genderOptions = [
-      'Masculino', 'Feminino', 'Outro'
-    ]
-
+    const genderOptions = ['Masculino', 'Feminino', 'Outro']
     const provinceOptions = [
       'Maputo', 'Gaza', 'Inhambane', 'Sofala', 'Manica',
       'Tete', 'Zambézia', 'Nampula', 'Cabo Delgado', 'Niassa'
     ]
+
+    // Watcher para atualizar a validade quando a categoria ou data de início mudar
+    watch(
+      [() => newSubscription.value.category, () => newSubscription.value.startAt],
+      ([newCategory, newStartAt]) => {
+        const defaultValidityDays = newCategory === 'ganha-facil' ? 70 : 30
+        const startDate = new Date(newStartAt || Date.now())
+        newSubscription.value.endAt = date.formatDate(
+          startDate.getTime() + defaultValidityDays * 24 * 60 * 60 * 1000,
+          'YYYY-MM-DD'
+        )
+      }
+    )
+
+    const showAddSubscriptionDialog = () => {
+      if (!clientData.value) {
+        $q.notify({
+          type: 'negative',
+          message: 'Nenhum cliente seleccionado.'
+        })
+        return
+      }
+      // Inicializa com validade padrão de 30 dias
+      newSubscription.value = {
+        category: '',
+        payedByNumber: clientData.value.telefone,
+        startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
+        endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD')
+      }
+      addSubscriptionDialog.value = true
+    }
+
+    const confirmAddSubscription = async () => {
+      if (!clientData.value) {
+        $q.notify({
+          type: 'negative',
+          message: 'Nenhum cliente seleccionado.'
+        })
+        return
+      }
+
+      if (!newSubscription.value.category) {
+        $q.notify({
+          type: 'warning',
+          message: 'Por favor, selecione um tipo de plano.'
+        })
+        return
+      }
+
+      try {
+        // Garante que a validade seja correta antes de salvar
+        const defaultValidityDays = newSubscription.value.category === 'ganha-facil' ? 70 : 30
+        newSubscription.value.endAt = date.formatDate(
+          new Date(newSubscription.value.startAt).getTime() + defaultValidityDays * 24 * 60 * 60 * 1000,
+          'YYYY-MM-DD'
+        )
+
+        // Adiciona a nova assinatura no array local
+        const updatedPayments = [
+          ...(clientData.value.payments || []),
+          { ...newSubscription.value }
+        ]
+
+        // Envia para o servidor
+        await api.patch(`/clients/${clientData.value.id}/`, {
+          payments: updatedPayments
+        })
+
+        // Atualiza local com sucesso
+        clientData.value.payments = updatedPayments
+        addSubscriptionDialog.value = false
+        $q.notify({
+          type: 'positive',
+          message: 'Assinatura adicionada com sucesso!'
+        })
+      } catch (err) {
+        console.error('Erro ao adicionar assinatura:', err)
+        $q.notify({
+          type: 'negative',
+          message: 'Erro ao adicionar assinatura'
+        })
+      }
+    }
+
+    const addNewSubscription = () => {
+      // Inicializa nova assinatura com validade padrão de 30 dias
+      const newSub = {
+        category: '',
+        payedByNumber: editForm.value.telefone,
+        startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
+        endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD')
+      }
+
+      editForm.value.payments.push(newSub)
+      activeEditSubscriptionTab.value = editForm.value.payments.length - 1
+    }
+
+    // Watcher para atualizar a validade das assinaturas no modo de edição
+    watch(
+      () => editForm.value.payments,
+      (newPayments) => {
+        newPayments.forEach((subscription) => {
+          if (subscription.category && subscription.startAt) {
+            const defaultValidityDays = subscription.category === 'ganha-facil' ? 70 : 30
+            const startDate = new Date(subscription.startAt)
+            subscription.endAt = date.formatDate(
+              startDate.getTime() + defaultValidityDays * 24 * 60 * 60 * 1000,
+              'YYYY-MM-DD'
+            )
+          }
+        })
+      },
+      { deep: true }
+    )
+
+    const removeSubscription = (index) => {
+      if (editForm.value.payments.length <= 1) {
+        $q.notify({
+          type: 'warning',
+          message: 'O usuário deve ter pelo menos uma assinatura'
+        })
+        return
+      }
+
+      editForm.value.payments.splice(index, 1)
+      if (activeEditSubscriptionTab.value >= editForm.value.payments.length) {
+        activeEditSubscriptionTab.value = editForm.value.payments.length - 1
+      }
+    }
 
     const searchClient = async () => {
       if (!searchQuery.value) {
@@ -539,7 +664,7 @@ export default {
       searchLoading.value = true
 
       try {
-        const response = await api.get(`/users/filter/?telefone=${encodeURIComponent(searchQuery.value)}`)
+        const response = await api.get(`/clients/filter/?telefone=${encodeURIComponent(searchQuery.value)}`)
         console.log('API response:', response.data)
 
         if (Array.isArray(response.data) && response.data.length > 0) {
@@ -588,7 +713,6 @@ export default {
         provincia: clientData.value.provincia,
         payments: clientData.value.payments ? [...clientData.value.payments] : [],
         password: clientData.value.password || ''
-
       }
       editMode.value = true
     }
@@ -601,7 +725,6 @@ export default {
       saveLoading.value = true
 
       try {
-        // Preparar os dados para enviar
         const payload = {
           name: editForm.value.name,
           apelido: editForm.value.apelido,
@@ -610,24 +733,16 @@ export default {
           gender: editForm.value.gender,
           birthYear: editForm.value.birthYear,
           provincia: editForm.value.provincia,
-          payments: editForm.value.payments,
-          // payments será atualizado separadamente
+          payments: editForm.value.payments
         }
 
-        // Chamada PATCH para atualizar os dados básicos
-        await api.patch(`/users/${editForm.value.id}/`, payload)
-
-        // Atualizar os dados locais
-        clientData.value = {
-          ...clientData.value,
-          ...editForm.value
-        }
-
+        await api.patch(`/clients/${editForm.value.id}/`, payload)
+        clientData.value = { ...clientData.value, ...editForm.value }
         editMode.value = false
         $q.notify({
           type: 'positive',
-          message: 'Alterações salvas com sucesso!'
-        })
+          message: 'Alterações salvas com sucesso!'})
+
       } catch (err) {
         console.error('Erro ao salvar:', err)
         $q.notify({
@@ -690,82 +805,6 @@ export default {
       return isDateFuture(subscription.endAt) ? 'positive' : 'negative'
     }
 
-    const showAddSubscriptionDialog = () => {
-      newSubscription.value = {
-        category: '',
-        payedByNumber: clientData.value.telefone,
-        startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
-        endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD')
-      }
-      addSubscriptionDialog.value = true
-    }
-
-
-    const confirmAddSubscription = async () => {
-  if (!clientData.value) {
-    $q.notify({
-      type: 'negative',
-      message: 'Nenhum cliente seleccionado.'
-    })
-    return
-  }
-
-  try {
-    // adiciona a nova assinatura no array local
-    const updatedPayments = [
-      ...(clientData.value.payments || []),
-      { ...newSubscription.value }
-    ]
-
-    // envia para o servidor
-    await api.patch(`/users/${clientData.value.id}/`, {
-      payments: updatedPayments
-    })
-
-    // atualiza local com sucesso
-    clientData.value.payments = updatedPayments
-    addSubscriptionDialog.value = false
-    $q.notify({
-      type: 'positive',
-      message: 'Assinatura adicionada com sucesso!'
-    })
-  } catch (err) {
-    console.error('Erro ao adicionar assinatura:', err)
-    $q.notify({
-      type: 'negative',
-      message: 'Erro ao adicionar assinatura'
-    })
-  }
-}
-
-
-    const addNewSubscription = () => {
-      const newSub = {
-        category: '',
-        payedByNumber: editForm.value.telefone,
-        startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
-        endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD')
-      }
-
-      editForm.value.payments.push(newSub)
-      activeEditSubscriptionTab.value = editForm.value.payments.length - 1
-    }
-
-    const removeSubscription = (index) => {
-      if (editForm.value.payments.length <= 1) {
-        $q.notify({
-          type: 'warning',
-          message: 'O usuário deve ter pelo menos uma assinatura'
-        })
-        return
-      }
-
-      editForm.value.payments.splice(index, 1)
-      if (activeEditSubscriptionTab.value >= editForm.value.payments.length) {
-        activeEditSubscriptionTab.value = editForm.value.payments.length - 1
-      }
-    }
-
     return {
       searchQuery,
       searchLoading,
@@ -800,7 +839,6 @@ export default {
     }
   }
 }
-
 </script>
 
 <style lang="scss">

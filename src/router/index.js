@@ -1,30 +1,49 @@
-import { defineRouter } from '#q-app/wrappers'
-import { createRouter, createMemoryHistory, createWebHistory, createWebHashHistory } from 'vue-router'
-import routes from './routes'
+// src/router/index.js
+import { createRouter, createWebHistory } from 'vue-router'
+import Layout from '../layouts/MainLayout.vue'
+import Users from '../pages/UsersPage.vue'
+import Login from '../pages/Login.vue'
+import Workers from '../pages/WorkersPage.vue'
+import Payments from '../pages/PaymentsPage.vue'
 
-/*
- * If not building with SSR mode, you can
- * directly export the Router instantiation;
- *
- * The function below can be async too; either use
- * async/await or return a Promise which resolves
- * with the Router instance.
- */
+const routes = [
+  {
+    path: '/',
+    component: Layout,
+    children: [
+      { path: '', component: () => import('pages/DashboardPage.vue') },
+      { path: 'users', component: Users },
+      { path: 'workers', component: Workers },
+      { path: 'payments', component: Payments }
+    ],
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/login',
+    component: Login,
+    meta: { requiresAuth: false }
+  },
+  // {
+  //   path: '/forgot-password',
+  //   component: () => import('pages/ForgotPassword.vue'), // Placeholder para futura implementação
+  //   meta: { requiresAuth: false }
+  // }
+]
 
-export default defineRouter(function (/* { store, ssrContext } */) {
-  const createHistory = process.env.SERVER
-    ? createMemoryHistory
-    : (process.env.VUE_ROUTER_MODE === 'history' ? createWebHistory : createWebHashHistory)
-
-  const Router = createRouter({
-    scrollBehavior: () => ({ left: 0, top: 0 }),
-    routes,
-
-    // Leave this as is and make changes in quasar.conf.js instead!
-    // quasar.conf.js -> build -> vueRouterMode
-    // quasar.conf.js -> build -> publicPath
-    history: createHistory(process.env.VUE_ROUTER_BASE)
-  })
-
-  return Router
+const router = createRouter({
+  history: createWebHistory(),
+  routes
 })
+
+router.beforeEach((to, from, next) => {
+  const isAuthenticated = !!localStorage.getItem('auth_token')
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    next('/login')
+  } else if (to.path === '/login' && isAuthenticated) {
+    next('/')
+  } else {
+    next()
+  }
+})
+
+export default router
