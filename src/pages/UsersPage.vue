@@ -41,7 +41,14 @@
                   outline
                   @click="resetSearch"
                 />
+                 <q-btn
+    color="positive"
+    label="Nova Conta"
+    class="full-height"
+    @click="showCreateUserDialog"
+  />
               </div>
+
             </div>
           </q-card-section>
         </q-card>
@@ -407,7 +414,7 @@
       </div>
 
       <!-- Empty State -->
-      <div class="col-12" v-if="!clientData && !searchLoading">
+      <div class="col-12" v-if="!clientData && !searchLoading && !showCreateUser">
         <q-card class="empty-state-card">
           <q-card-section class="text-center">
             <q-icon name="search_off" size="xl" color="grey-5" class="q-mb-md" />
@@ -469,6 +476,82 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+
+    <!-- <q-dialog v-model="createUserDialog">
+  <q-card style="min-width: 400px">
+    <q-card-section>
+      <div class="text-h6">Criar Nova Conta</div>
+    </q-card-section>
+
+    <q-card-section class="q-pt-none">
+      <q-input v-model="newUser.name" outlined label="Nome" class="q-mb-md" />
+      <q-input v-model="newUser.apelido" outlined label="Apelido" class="q-mb-md" />
+      <q-input v-model="newUser.telefone" outlined label="Telefone" mask="###########" class="q-mb-md" />
+      <q-input v-model="newUser.email" outlined label="Email" type="email" class="q-mb-md" />
+      <q-input v-model="newUser.password" outlined label="Senha" type="password" class="q-mb-md" />
+
+      <q-select v-model="newUser.gender" outlined label="Gênero" :options="genderOptions" class="q-mb-md" />
+      <q-input v-model="newUser.birthYear" outlined label="Ano de Nascimento" type="number" class="q-mb-md" />
+      <q-select v-model="newUser.provincia" outlined label="Província" :options="provinceOptions" class="q-mb-md" />
+    </q-card-section>
+
+    <q-card-actions align="right">
+      <q-btn flat label="Cancelar" color="negative" v-close-popup />
+      <q-btn label="Criar" color="positive" @click="createUser" />
+    </q-card-actions>
+  </q-card>
+</q-dialog> -->
+
+<!-- Formulário de Criação de Usuário -->
+<div class="col-12" v-if="showCreateUser">
+  <q-card class="q-pa-md q-mt-md">
+    <q-card-section>
+      <div class="text-h6 q-mb-md">Criar Nova Conta</div>
+
+      <div class="row q-col-gutter-md">
+        <div class="col-12 col-md-6">
+          <q-input v-model="newUser.name" outlined label="Nome" />
+        </div>
+        <div class="col-12 col-md-6">
+          <q-input v-model="newUser.apelido" outlined label="Apelido" />
+        </div>
+        <div class="col-12 col-md-6">
+          <q-input v-model="newUser.telefone" outlined label="Telefone" mask="###########" />
+        </div>
+        <div class="col-12 col-md-6">
+          <q-input v-model="newUser.password" outlined label="Senha" type="password" />
+        </div>
+        <div class="col-12 col-md-6">
+          <q-input v-model="newUser.confirmPassword" outlined label="Confirmar Senha" type="password" />
+        </div>
+        <div class="col-12 col-md-6">
+          <q-select v-model="newUser.gender" outlined label="Gênero" :options="genderOptions" />
+        </div>
+        <div class="col-12 col-md-6">
+          <q-select
+            v-model="newUser.birthYear"
+            outlined
+            label="Ano de Nascimento"
+            :options="birthYearOptions"
+          />
+        </div>
+        <div class="col-12 col-md-6">
+          <q-select v-model="newUser.provincia" outlined label="Província" :options="provinceOptions" />
+        </div>
+      </div>
+    </q-card-section>
+
+    <q-card-actions align="right">
+      <q-btn flat label="Cancelar" color="negative" @click="showCreateUser = false" />
+      <q-btn label="Criar" color="positive" @click="createUser" />
+    </q-card-actions>
+  </q-card>
+</div>
+
+
+
+
   </q-page>
 </template>
 
@@ -696,6 +779,7 @@ export default {
       searchQuery.value = ''
       clientData.value = null
       editMode.value = false
+      showCreateUser.value = false
     }
 
     const enterEditMode = () => {
@@ -805,6 +889,149 @@ export default {
       return isDateFuture(subscription.endAt) ? 'positive' : 'negative'
     }
 
+
+
+
+
+//     const createUserDialog = ref(false)
+// const newUser = ref({
+//   name: '',
+//   apelido: '',
+//   telefone: '',
+//   email: '',
+//   password: '',
+//   gender: '',
+//   birthYear: '',
+//   provincia: ''
+// })
+
+// const showCreateUserDialog = () => {
+//   createUserDialog.value = true
+//   newUser.value = {
+//     name: '',
+//     apelido: '',
+//     telefone: '',
+//     email: '',
+//     password: '',
+//     gender: '',
+//     birthYear: '',
+//     provincia: ''
+//   }
+// }
+
+// const createUser = async () => {
+//   if (!newUser.value.telefone || !newUser.value.password) {
+//     $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
+//     return
+//   }
+
+//   try {
+//     const response = await api.post('/client/register/', newUser.value)
+//     $q.notify({ type: 'positive', message: 'Usuário criado com sucesso!' })
+//     createUserDialog.value = false
+//     clientData.value = response.data
+//   } catch (err) {
+//     console.error(err)
+//     $q.notify({ type: 'negative', message: 'Erro ao criar usuário' })
+//   }
+// }
+
+const showCreateUser = ref(false)
+
+const newUser = ref({
+  name: '',
+  apelido: '',
+  telefone: '',
+  password: '',
+  confirmPassword: '',
+  gender: '',
+  birthYear: null,
+  provincia: ''
+})
+
+const currentYear = new Date().getFullYear()
+const birthYearOptions = Array.from({ length: 100 }, (_, i) => currentYear - i).filter(y => (currentYear - y) >= 17)
+
+const resetNewUser = () => {
+  newUser.value = {
+    name: '',
+    apelido: '',
+    telefone: '',
+    email: '',
+    password: '',
+    gender: '',
+    birthYear: '',
+    provincia: ''
+  }
+}
+
+const showCreateUserDialog = () => {
+  resetNewUser()  // opcional, limpa o formulário
+    searchQuery.value = ''
+    clientData.value = null
+    editMode.value = false
+  showCreateUser.value = true
+}
+
+
+
+// const createUser = async () => {
+//   if (!newUser.value.telefone || !newUser.value.password) {
+//     $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
+//     return
+//   }
+
+//   try {
+//     const response = await api.post('/client/register/', newUser.value)
+
+//     $q.notify({
+//       type: 'positive',
+//       message: response.data?.message || 'Usuário criado com sucesso!'
+//     })
+
+//     clientData.value = response.data
+//     resetNewUser()
+//   } catch (err) {
+//     console.error(err)
+
+//     const errorMsg =
+//       err.response?.data?.error ||
+//       err.response?.data?.detail ||
+//       'Erro ao criar usuário'
+
+//     $q.notify({ type: 'negative', message: errorMsg })
+//   }
+// }
+
+const createUser = async () => {
+  if (!newUser.value.telefone || !newUser.value.password) {
+    $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
+    return
+  }
+
+  if (newUser.value.password !== newUser.value.confirmPassword) {
+    $q.notify({ type: 'negative', message: 'As senhas não coincidem!' })
+    return
+  }
+
+  try {
+    const response = await api.post('/client/register/', newUser.value)
+    $q.notify({ type: 'positive', message: response.data?.message || 'Usuário criado com sucesso!' })
+    clientData.value = response.data
+    resetNewUser()
+
+    // Oculta o formulário de criação
+    showCreateUser.value = false
+  } catch (err) {
+    console.error(err)
+    const errorMsg = err.response?.data?.error || err.response?.data?.detail || 'Erro ao criar usuário'
+    $q.notify({ type: 'negative', message: errorMsg })
+  }
+}
+
+
+
+
     return {
       searchQuery,
       searchLoading,
@@ -835,7 +1062,14 @@ export default {
       showAddSubscriptionDialog,
       confirmAddSubscription,
       addNewSubscription,
-      removeSubscription
+      removeSubscription,
+
+      showCreateUser,
+  newUser,
+  createUser,
+  resetNewUser,
+  showCreateUserDialog,
+  birthYearOptions,
     }
   }
 }

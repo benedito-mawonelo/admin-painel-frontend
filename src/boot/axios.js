@@ -14,7 +14,7 @@
 import { boot } from 'quasar/wrappers'
 import axios from 'axios'
 
-// const api = axios.create({ baseURL: 'http://192.168.1.32:8004/api' })
+// const api = axios.create({ baseURL: 'http://10.254.138.171:8004/api' })
 const api = axios.create({ baseURL: 'https://mawonelo.pythonanywhere.com/api' })
 
 // Interceptor para adicionar o token em todas as requisições
