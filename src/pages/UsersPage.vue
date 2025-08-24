@@ -44,7 +44,7 @@
                  <q-btn
     color="positive"
     label="Nova Conta"
-    class="full-height"
+    class="full-height q-ml-sm"
     @click="showCreateUserDialog"
   />
               </div>
