@@ -252,13 +252,33 @@
                       val => val.length >= 8 || 'Telefone inválido'
                     ]"
                   />
-                  <q-input
+                  <!-- <q-input
                     v-model="editForm.password"
                     outlined
                     label="Senha"
                     class="q-mb-md"
                     readonly
-                  />
+                  /> -->
+
+                  <div class="row items-center q-mb-md">
+  <q-input
+    v-model="editForm.password"
+    outlined
+    label="Senha"
+    readonly
+    class="col"
+  />
+  <q-btn
+    flat
+    round
+    icon="content_copy"
+    color="primary"
+    class="q-ml-sm"
+    @click="copyPassword(editForm.password)"
+    dense
+  />
+</div>
+
 
 
                   <q-input
@@ -618,6 +638,23 @@ export default {
         )
       }
     )
+
+    const copyPassword = (password) => {
+  if (!password) return
+  navigator.clipboard.writeText(password)
+    .then(() => {
+      $q.notify({
+        type: 'positive',
+        message: 'Senha copiada para a área de transferência!'
+      })
+    })
+    .catch(() => {
+      $q.notify({
+        type: 'negative',
+        message: 'Não foi possível copiar a senha.'
+      })
+    })
+}
 
     const showAddSubscriptionDialog = () => {
       if (!clientData.value) {
@@ -1070,6 +1107,7 @@ const createUser = async () => {
   resetNewUser,
   showCreateUserDialog,
   birthYearOptions,
+  copyPassword
     }
   }
 }
