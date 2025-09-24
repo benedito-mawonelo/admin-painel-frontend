@@ -41,14 +41,13 @@
                   outline
                   @click="resetSearch"
                 />
-                 <q-btn
-    color="positive"
-    label="Nova Conta"
-    class="full-height q-ml-sm"
-    @click="showCreateUserDialog"
-  />
+                <q-btn
+                  color="positive"
+                  label="Nova Conta"
+                  class="full-height q-ml-sm"
+                  @click="showCreateUserDialog"
+                />
               </div>
-
             </div>
           </q-card-section>
         </q-card>
@@ -60,11 +59,13 @@
           <q-card-section>
             <div class="row items-center q-mb-md">
               <q-avatar size="60px" class="q-mr-md">
-                <img :src="clientData.image || 'https://cdn.quasar.dev/img/avatar.png'">
+                <img :src="clientData.image || 'https://cdn.quasar.dev/img/avatar.png'" />
               </q-avatar>
 
               <div>
-                <h2 class="text-h5 text-weight-bold q-mb-xs">{{ clientData.name }} {{ clientData.apelido }}</h2>
+                <h2 class="text-h5 text-weight-bold q-mb-xs">
+                  {{ clientData.name }} {{ clientData.apelido }}
+                </h2>
                 <div class="text-subtitle1">
                   <q-icon name="phone" class="q-mr-xs" />
                   {{ clientData.telefone }}
@@ -114,7 +115,9 @@
                       <div class="subscription-info">
                         <div class="row items-center q-mb-sm">
                           <div class="col-4 col-md-2 text-grey-7">Plano:</div>
-                          <div class="col-8 col-md-4 text-weight-bold text-capitalize">{{ subscription.category }}</div>
+                          <div class="col-8 col-md-4 text-weight-bold text-capitalize">
+                            {{ subscription.category }}
+                          </div>
 
                           <div class="col-4 col-md-2 text-grey-7">Status:</div>
                           <div class="col-8 col-md-4">
@@ -126,7 +129,9 @@
 
                         <div class="row items-center q-mb-sm">
                           <div class="col-4 col-md-2 text-grey-7">Pagamento:</div>
-                          <div class="col-8 col-md-4 text-weight-bold">{{ subscription.payedByNumber }}</div>
+                          <div class="col-8 col-md-4 text-weight-bold">
+                            {{ subscription.payedByNumber }}
+                          </div>
 
                           <div class="col-4 col-md-2 text-grey-7">Início:</div>
                           <div class="col-8 col-md-4">{{ formatDate(subscription.startAt) }}</div>
@@ -135,7 +140,12 @@
                         <div class="row items-center">
                           <div class="col-4 col-md-2 text-grey-7">Expira em:</div>
                           <div class="col-8 col-md-4">
-                            <span :class="{'text-positive': isDateFuture(subscription.endAt), 'text-negative': !isDateFuture(subscription.endAt)}">
+                            <span
+                              :class="{
+                                'text-positive': isDateFuture(subscription.endAt),
+                                'text-negative': !isDateFuture(subscription.endAt),
+                              }"
+                            >
                               {{ formatDate(subscription.endAt) }}
                             </span>
                           </div>
@@ -150,26 +160,15 @@
                   </q-tab-panels>
                 </div>
 
-                <div v-else class="text-grey-7">
-                  Nenhuma assinatura ativa
-                </div>
+                <div v-else class="text-grey-7">Nenhuma assinatura ativa</div>
               </div>
             </div>
-
           </q-card-section>
 
           <q-card-actions align="right">
-            <q-btn
-              color="primary"
-              label="Editar Perfil"
-              outline
-              @click="enterEditMode"
-            />
+            <q-btn color="primary" label="Editar Perfil" outline @click="enterEditMode" />
 
-            <q-btn
-              color="primary"
-              label="Enviar Mensagem"
-            />
+            <q-btn color="primary" label="Enviar Mensagem" />
             <q-btn
               color="secondary"
               label="Adicionar Assinatura"
@@ -186,13 +185,7 @@
             <div class="row items-center q-mb-md">
               <div class="text-h5 text-weight-bold">Editar Perfil</div>
               <q-space />
-              <q-btn
-                icon="close"
-                flat
-                round
-                dense
-                @click="cancelEdit"
-              />
+              <q-btn icon="close" flat round dense @click="cancelEdit" />
             </div>
 
             <q-form @submit="saveChanges">
@@ -203,14 +196,9 @@
 
                   <div class="row items-center q-mb-md">
                     <q-avatar size="80px" class="q-mr-md">
-                      <img :src="editForm.image || 'https://cdn.quasar.dev/img/avatar.png'">
+                      <img :src="editForm.image || 'https://cdn.quasar.dev/img/avatar.png'" />
                     </q-avatar>
-                    <q-btn
-                      color="primary"
-                      label="Alterar Foto"
-                      outline
-                      @click="triggerFileInput"
-                    />
+                    <q-btn color="primary" label="Alterar Foto" outline @click="triggerFileInput" />
                     <input
                       type="file"
                       ref="fileInput"
@@ -227,7 +215,7 @@
                         outlined
                         label="Nome"
                         class="q-mb-md"
-                        :rules="[val => !!val || 'Campo obrigatório']"
+                        :rules="[(val) => !!val || 'Campo obrigatório']"
                       />
                     </div>
                     <div class="col-12 col-md-6">
@@ -248,8 +236,8 @@
                     unmasked-value
                     class="q-mb-md"
                     :rules="[
-                      val => !!val || 'Campo obrigatório',
-                      val => val.length >= 8 || 'Telefone inválido'
+                      (val) => !!val || 'Campo obrigatório',
+                      (val) => val.length >= 8 || 'Telefone inválido',
                     ]"
                   />
                   <!-- <q-input
@@ -261,25 +249,23 @@
                   /> -->
 
                   <div class="row items-center q-mb-md">
-  <q-input
-    v-model="editForm.password"
-    outlined
-    label="Senha"
-    readonly
-    class="col"
-  />
-  <q-btn
-    flat
-    round
-    icon="content_copy"
-    color="primary"
-    class="q-ml-sm"
-    @click="copyPassword(editForm.password)"
-    dense
-  />
-</div>
-
-
+                    <q-input
+                      v-model="editForm.password"
+                      outlined
+                      label="Senha"
+                      readonly
+                      class="col"
+                    />
+                    <q-btn
+                      flat
+                      round
+                      icon="content_copy"
+                      color="primary"
+                      class="q-ml-sm"
+                      @click="copyPassword(editForm.password)"
+                      dense
+                    />
+                  </div>
 
                   <q-input
                     v-model="editForm.email"
@@ -287,9 +273,7 @@
                     label="Email"
                     type="email"
                     class="q-mb-md"
-                    :rules="[
-                      val => !val || /.+@.+\..+/.test(val) || 'Email inválido'
-                    ]"
+                    :rules="[(val) => !val || /.+@.+\..+/.test(val) || 'Email inválido']"
                   />
 
                   <q-select
@@ -346,7 +330,6 @@
                       :label="subscription.category || `Plano ${index + 1}`"
                     >
                       <q-btn
-                        v-if="editForm.payments.length > 1"
                         icon="close"
                         dense
                         flat
@@ -372,7 +355,7 @@
                             label="Tipo de Plano"
                             :options="planOptions"
                             class="q-mb-md"
-                            :rules="[val => !!val || 'Selecione um plano']"
+                            :rules="[(val) => !!val || 'Selecione um plano']"
                           />
                         </div>
 
@@ -384,7 +367,7 @@
                             mask="###########"
                             unmasked-value
                             class="q-mb-md"
-                            :rules="[val => !!val || 'Campo obrigatório']"
+                            :rules="[(val) => !!val || 'Campo obrigatório']"
                           />
                         </div>
 
@@ -414,13 +397,7 @@
               </div>
 
               <q-card-actions align="right" class="q-pa-none q-mt-lg">
-                <q-btn
-                  label="Cancelar"
-                  color="negative"
-                  flat
-                  @click="cancelEdit"
-                  class="q-mr-sm"
-                />
+                <q-btn label="Cancelar" color="negative" flat @click="cancelEdit" class="q-mr-sm" />
                 <q-btn
                   label="Salvar Alterações"
                   color="positive"
@@ -497,7 +474,6 @@
       </q-card>
     </q-dialog>
 
-
     <!-- <q-dialog v-model="createUserDialog">
   <q-card style="min-width: 400px">
     <q-card-section>
@@ -523,58 +499,63 @@
   </q-card>
 </q-dialog> -->
 
-<!-- Formulário de Criação de Usuário -->
-<div class="col-12" v-if="showCreateUser">
-  <q-card class="q-pa-md q-mt-md">
-    <q-card-section>
-      <div class="text-h6 q-mb-md">Criar Nova Conta</div>
+    <!-- Formulário de Criação de Usuário -->
+    <div class="col-12" v-if="showCreateUser">
+      <q-card class="q-pa-md q-mt-md">
+        <q-card-section>
+          <div class="text-h6 q-mb-md">Criar Nova Conta</div>
 
-      <div class="row q-col-gutter-md">
-        <div class="col-12 col-md-6">
-          <q-input v-model="newUser.name" outlined label="Nome" />
-        </div>
-        <div class="col-12 col-md-6">
-          <q-input v-model="newUser.apelido" outlined label="Apelido" />
-        </div>
-        <div class="col-12 col-md-6">
-          <q-input v-model="newUser.telefone" outlined label="Telefone" mask="###########" />
-        </div>
-        <div class="col-12 col-md-6">
-          <q-input v-model="newUser.password" outlined label="Senha" type="password" />
-        </div>
-        <div class="col-12 col-md-6">
-          <q-input v-model="newUser.confirmPassword" outlined label="Confirmar Senha" type="password" />
-        </div>
-        <div class="col-12 col-md-6">
-          <q-select v-model="newUser.gender" outlined label="Gênero" :options="genderOptions" />
-        </div>
-        <div class="col-12 col-md-6">
-          <q-select
-            v-model="newUser.birthYear"
-            outlined
-            label="Ano de Nascimento"
-            :options="birthYearOptions"
-          />
-        </div>
-        <div class="col-12 col-md-6">
-          <q-select v-model="newUser.provincia" outlined label="Província" :options="provinceOptions" />
-        </div>
-      </div>
-    </q-card-section>
+          <div class="row q-col-gutter-md">
+            <div class="col-12 col-md-6">
+              <q-input v-model="newUser.name" outlined label="Nome" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-input v-model="newUser.apelido" outlined label="Apelido" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-input v-model="newUser.telefone" outlined label="Telefone" mask="###########" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-input v-model="newUser.password" outlined label="Senha" type="password" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-input
+                v-model="newUser.confirmPassword"
+                outlined
+                label="Confirmar Senha"
+                type="password"
+              />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-select v-model="newUser.gender" outlined label="Gênero" :options="genderOptions" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-select
+                v-model="newUser.birthYear"
+                outlined
+                label="Ano de Nascimento"
+                :options="birthYearOptions"
+              />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-select
+                v-model="newUser.provincia"
+                outlined
+                label="Província"
+                :options="provinceOptions"
+              />
+            </div>
+          </div>
+        </q-card-section>
 
-    <q-card-actions align="right">
-      <q-btn flat label="Cancelar" color="negative" @click="showCreateUser = false" />
-      <q-btn label="Criar" color="positive" @click="createUser" />
-    </q-card-actions>
-  </q-card>
-</div>
-
-
-
-
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" color="negative" @click="showCreateUser = false" />
+          <q-btn label="Criar" color="positive" @click="createUser" />
+        </q-card-actions>
+      </q-card>
+    </div>
   </q-page>
 </template>
-
 
 <script>
 import { ref, watch } from 'vue'
@@ -599,7 +580,7 @@ export default {
       category: '',
       payedByNumber: '',
       startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
-      endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD')
+      endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD'),
     })
 
     const editForm = ref({
@@ -613,17 +594,30 @@ export default {
       birthYear: '',
       provincia: '',
       payments: [],
-      password: ''
+      password: '',
     })
 
     const planOptions = [
-      'ganha-facil', 'videos-practical-pesado', 'profissional', 'videos', 'ligeiro_pesado', 'videos-practical-ligeiro'
+      'ganha-facil',
+      'videos-practical-pesado',
+      'profissional',
+      'videos',
+      'ligeiro_pesado',
+      'videos-practical-ligeiro',
     ]
 
     const genderOptions = ['Masculino', 'Feminino', 'Outro']
     const provinceOptions = [
-      'Maputo', 'Gaza', 'Inhambane', 'Sofala', 'Manica',
-      'Tete', 'Zambézia', 'Nampula', 'Cabo Delgado', 'Niassa'
+      'Maputo',
+      'Gaza',
+      'Inhambane',
+      'Sofala',
+      'Manica',
+      'Tete',
+      'Zambézia',
+      'Nampula',
+      'Cabo Delgado',
+      'Niassa',
     ]
 
     // Watcher para atualizar a validade quando a categoria ou data de início mudar
@@ -634,33 +628,34 @@ export default {
         const startDate = new Date(newStartAt || Date.now())
         newSubscription.value.endAt = date.formatDate(
           startDate.getTime() + defaultValidityDays * 24 * 60 * 60 * 1000,
-          'YYYY-MM-DD'
+          'YYYY-MM-DD',
         )
-      }
+      },
     )
 
     const copyPassword = (password) => {
-  if (!password) return
-  navigator.clipboard.writeText(password)
-    .then(() => {
-      $q.notify({
-        type: 'positive',
-        message: 'Senha copiada para a área de transferência!'
-      })
-    })
-    .catch(() => {
-      $q.notify({
-        type: 'negative',
-        message: 'Não foi possível copiar a senha.'
-      })
-    })
-}
+      if (!password) return
+      navigator.clipboard
+        .writeText(password)
+        .then(() => {
+          $q.notify({
+            type: 'positive',
+            message: 'Senha copiada para a área de transferência!',
+          })
+        })
+        .catch(() => {
+          $q.notify({
+            type: 'negative',
+            message: 'Não foi possível copiar a senha.',
+          })
+        })
+    }
 
     const showAddSubscriptionDialog = () => {
       if (!clientData.value) {
         $q.notify({
           type: 'negative',
-          message: 'Nenhum cliente seleccionado.'
+          message: 'Nenhum cliente seleccionado.',
         })
         return
       }
@@ -669,7 +664,7 @@ export default {
         category: '',
         payedByNumber: clientData.value.telefone,
         startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
-        endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD')
+        endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD'),
       }
       addSubscriptionDialog.value = true
     }
@@ -678,7 +673,7 @@ export default {
       if (!clientData.value) {
         $q.notify({
           type: 'negative',
-          message: 'Nenhum cliente seleccionado.'
+          message: 'Nenhum cliente seleccionado.',
         })
         return
       }
@@ -686,7 +681,7 @@ export default {
       if (!newSubscription.value.category) {
         $q.notify({
           type: 'warning',
-          message: 'Por favor, selecione um tipo de plano.'
+          message: 'Por favor, selecione um tipo de plano.',
         })
         return
       }
@@ -695,19 +690,17 @@ export default {
         // Garante que a validade seja correta antes de salvar
         const defaultValidityDays = newSubscription.value.category === 'ganha-facil' ? 70 : 30
         newSubscription.value.endAt = date.formatDate(
-          new Date(newSubscription.value.startAt).getTime() + defaultValidityDays * 24 * 60 * 60 * 1000,
-          'YYYY-MM-DD'
+          new Date(newSubscription.value.startAt).getTime() +
+            defaultValidityDays * 24 * 60 * 60 * 1000,
+          'YYYY-MM-DD',
         )
 
         // Adiciona a nova assinatura no array local
-        const updatedPayments = [
-          ...(clientData.value.payments || []),
-          { ...newSubscription.value }
-        ]
+        const updatedPayments = [...(clientData.value.payments || []), { ...newSubscription.value }]
 
         // Envia para o servidor
         await api.patch(`/clients/${clientData.value.id}/`, {
-          payments: updatedPayments
+          payments: updatedPayments,
         })
 
         // Atualiza local com sucesso
@@ -715,13 +708,13 @@ export default {
         addSubscriptionDialog.value = false
         $q.notify({
           type: 'positive',
-          message: 'Assinatura adicionada com sucesso!'
+          message: 'Assinatura adicionada com sucesso!',
         })
       } catch (err) {
         console.error('Erro ao adicionar assinatura:', err)
         $q.notify({
           type: 'negative',
-          message: 'Erro ao adicionar assinatura'
+          message: 'Erro ao adicionar assinatura',
         })
       }
     }
@@ -732,7 +725,7 @@ export default {
         category: '',
         payedByNumber: editForm.value.telefone,
         startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
-        endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD')
+        endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD'),
       }
 
       editForm.value.payments.push(newSub)
@@ -749,22 +742,22 @@ export default {
             const startDate = new Date(subscription.startAt)
             subscription.endAt = date.formatDate(
               startDate.getTime() + defaultValidityDays * 24 * 60 * 60 * 1000,
-              'YYYY-MM-DD'
+              'YYYY-MM-DD',
             )
           }
         })
       },
-      { deep: true }
+      { deep: true },
     )
 
     const removeSubscription = (index) => {
-      if (editForm.value.payments.length <= 1) {
-        $q.notify({
-          type: 'warning',
-          message: 'O usuário deve ter pelo menos uma assinatura'
-        })
-        return
-      }
+      // if (editForm.value.payments.length <= 1) {
+      //   $q.notify({
+      //     type: 'warning',
+      //     message: 'O usuário deve ter pelo menos uma assinatura'
+      //   })
+      //   return
+      // }
 
       editForm.value.payments.splice(index, 1)
       if (activeEditSubscriptionTab.value >= editForm.value.payments.length) {
@@ -776,7 +769,7 @@ export default {
       if (!searchQuery.value) {
         $q.notify({
           type: 'warning',
-          message: 'Digite um telefone, nome ou ID para pesquisar'
+          message: 'Digite um telefone, nome ou ID para pesquisar',
         })
         return
       }
@@ -784,20 +777,22 @@ export default {
       searchLoading.value = true
 
       try {
-        const response = await api.get(`/clients/filter/?telefone=${encodeURIComponent(searchQuery.value)}`)
+        const response = await api.get(
+          `/clients/filter/?telefone=${encodeURIComponent(searchQuery.value)}`,
+        )
         console.log('API response:', response.data)
 
         if (Array.isArray(response.data) && response.data.length > 0) {
           clientData.value = response.data[0]
           $q.notify({
             type: 'positive',
-            message: 'Usuário encontrado com sucesso!'
+            message: 'Usuário encontrado com sucesso!',
           })
         } else {
           clientData.value = null
           $q.notify({
             type: 'warning',
-            message: 'Nenhum usuário encontrado'
+            message: 'Nenhum usuário encontrado',
           })
         }
       } catch (err) {
@@ -805,7 +800,7 @@ export default {
         clientData.value = null
         $q.notify({
           type: 'negative',
-          message: 'Erro ao buscar usuário'
+          message: 'Erro ao buscar usuário',
         })
       } finally {
         searchLoading.value = false
@@ -833,7 +828,7 @@ export default {
         birthYear: clientData.value.birthYear,
         provincia: clientData.value.provincia,
         payments: clientData.value.payments ? [...clientData.value.payments] : [],
-        password: clientData.value.password || ''
+        password: clientData.value.password || '',
       }
       editMode.value = true
     }
@@ -854,7 +849,7 @@ export default {
           gender: editForm.value.gender,
           birthYear: editForm.value.birthYear,
           provincia: editForm.value.provincia,
-          payments: editForm.value.payments
+          payments: editForm.value.payments,
         }
 
         await api.patch(`/clients/${editForm.value.id}/`, payload)
@@ -862,13 +857,13 @@ export default {
         editMode.value = false
         $q.notify({
           type: 'positive',
-          message: 'Alterações salvas com sucesso!'})
-
+          message: 'Alterações salvas com sucesso!',
+        })
       } catch (err) {
         console.error('Erro ao salvar:', err)
         $q.notify({
           type: 'negative',
-          message: 'Erro ao salvar alterações'
+          message: 'Erro ao salvar alterações',
         })
       } finally {
         saveLoading.value = false
@@ -926,148 +921,145 @@ export default {
       return isDateFuture(subscription.endAt) ? 'positive' : 'negative'
     }
 
+    //     const createUserDialog = ref(false)
+    // const newUser = ref({
+    //   name: '',
+    //   apelido: '',
+    //   telefone: '',
+    //   email: '',
+    //   password: '',
+    //   gender: '',
+    //   birthYear: '',
+    //   provincia: ''
+    // })
 
+    // const showCreateUserDialog = () => {
+    //   createUserDialog.value = true
+    //   newUser.value = {
+    //     name: '',
+    //     apelido: '',
+    //     telefone: '',
+    //     email: '',
+    //     password: '',
+    //     gender: '',
+    //     birthYear: '',
+    //     provincia: ''
+    //   }
+    // }
 
+    // const createUser = async () => {
+    //   if (!newUser.value.telefone || !newUser.value.password) {
+    //     $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
+    //     return
+    //   }
 
+    //   try {
+    //     const response = await api.post('/client/register/', newUser.value)
+    //     $q.notify({ type: 'positive', message: 'Usuário criado com sucesso!' })
+    //     createUserDialog.value = false
+    //     clientData.value = response.data
+    //   } catch (err) {
+    //     console.error(err)
+    //     $q.notify({ type: 'negative', message: 'Erro ao criar usuário' })
+    //   }
+    // }
 
-//     const createUserDialog = ref(false)
-// const newUser = ref({
-//   name: '',
-//   apelido: '',
-//   telefone: '',
-//   email: '',
-//   password: '',
-//   gender: '',
-//   birthYear: '',
-//   provincia: ''
-// })
+    const showCreateUser = ref(false)
 
-// const showCreateUserDialog = () => {
-//   createUserDialog.value = true
-//   newUser.value = {
-//     name: '',
-//     apelido: '',
-//     telefone: '',
-//     email: '',
-//     password: '',
-//     gender: '',
-//     birthYear: '',
-//     provincia: ''
-//   }
-// }
+    const newUser = ref({
+      name: '',
+      apelido: '',
+      telefone: '',
+      password: '',
+      confirmPassword: '',
+      gender: '',
+      birthYear: null,
+      provincia: '',
+    })
 
-// const createUser = async () => {
-//   if (!newUser.value.telefone || !newUser.value.password) {
-//     $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
-//     return
-//   }
+    const currentYear = new Date().getFullYear()
+    const birthYearOptions = Array.from({ length: 100 }, (_, i) => currentYear - i).filter(
+      (y) => currentYear - y >= 17,
+    )
 
-//   try {
-//     const response = await api.post('/client/register/', newUser.value)
-//     $q.notify({ type: 'positive', message: 'Usuário criado com sucesso!' })
-//     createUserDialog.value = false
-//     clientData.value = response.data
-//   } catch (err) {
-//     console.error(err)
-//     $q.notify({ type: 'negative', message: 'Erro ao criar usuário' })
-//   }
-// }
+    const resetNewUser = () => {
+      newUser.value = {
+        name: '',
+        apelido: '',
+        telefone: '',
+        email: '',
+        password: '',
+        gender: '',
+        birthYear: '',
+        provincia: '',
+      }
+    }
 
-const showCreateUser = ref(false)
+    const showCreateUserDialog = () => {
+      resetNewUser() // opcional, limpa o formulário
+      searchQuery.value = ''
+      clientData.value = null
+      editMode.value = false
+      showCreateUser.value = true
+    }
 
-const newUser = ref({
-  name: '',
-  apelido: '',
-  telefone: '',
-  password: '',
-  confirmPassword: '',
-  gender: '',
-  birthYear: null,
-  provincia: ''
-})
+    // const createUser = async () => {
+    //   if (!newUser.value.telefone || !newUser.value.password) {
+    //     $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
+    //     return
+    //   }
 
-const currentYear = new Date().getFullYear()
-const birthYearOptions = Array.from({ length: 100 }, (_, i) => currentYear - i).filter(y => (currentYear - y) >= 17)
+    //   try {
+    //     const response = await api.post('/client/register/', newUser.value)
 
-const resetNewUser = () => {
-  newUser.value = {
-    name: '',
-    apelido: '',
-    telefone: '',
-    email: '',
-    password: '',
-    gender: '',
-    birthYear: '',
-    provincia: ''
-  }
-}
+    //     $q.notify({
+    //       type: 'positive',
+    //       message: response.data?.message || 'Usuário criado com sucesso!'
+    //     })
 
-const showCreateUserDialog = () => {
-  resetNewUser()  // opcional, limpa o formulário
-    searchQuery.value = ''
-    clientData.value = null
-    editMode.value = false
-  showCreateUser.value = true
-}
+    //     clientData.value = response.data
+    //     resetNewUser()
+    //   } catch (err) {
+    //     console.error(err)
 
+    //     const errorMsg =
+    //       err.response?.data?.error ||
+    //       err.response?.data?.detail ||
+    //       'Erro ao criar usuário'
 
+    //     $q.notify({ type: 'negative', message: errorMsg })
+    //   }
+    // }
 
-// const createUser = async () => {
-//   if (!newUser.value.telefone || !newUser.value.password) {
-//     $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
-//     return
-//   }
+    const createUser = async () => {
+      if (!newUser.value.telefone || !newUser.value.password) {
+        $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
+        return
+      }
 
-//   try {
-//     const response = await api.post('/client/register/', newUser.value)
+      if (newUser.value.password !== newUser.value.confirmPassword) {
+        $q.notify({ type: 'negative', message: 'As senhas não coincidem!' })
+        return
+      }
 
-//     $q.notify({
-//       type: 'positive',
-//       message: response.data?.message || 'Usuário criado com sucesso!'
-//     })
+      try {
+        const response = await api.post('/client/register/', newUser.value)
+        $q.notify({
+          type: 'positive',
+          message: response.data?.message || 'Usuário criado com sucesso!',
+        })
+        clientData.value = response.data
+        resetNewUser()
 
-//     clientData.value = response.data
-//     resetNewUser()
-//   } catch (err) {
-//     console.error(err)
-
-//     const errorMsg =
-//       err.response?.data?.error ||
-//       err.response?.data?.detail ||
-//       'Erro ao criar usuário'
-
-//     $q.notify({ type: 'negative', message: errorMsg })
-//   }
-// }
-
-const createUser = async () => {
-  if (!newUser.value.telefone || !newUser.value.password) {
-    $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
-    return
-  }
-
-  if (newUser.value.password !== newUser.value.confirmPassword) {
-    $q.notify({ type: 'negative', message: 'As senhas não coincidem!' })
-    return
-  }
-
-  try {
-    const response = await api.post('/client/register/', newUser.value)
-    $q.notify({ type: 'positive', message: response.data?.message || 'Usuário criado com sucesso!' })
-    clientData.value = response.data
-    resetNewUser()
-
-    // Oculta o formulário de criação
-    showCreateUser.value = false
-  } catch (err) {
-    console.error(err)
-    const errorMsg = err.response?.data?.error || err.response?.data?.detail || 'Erro ao criar usuário'
-    $q.notify({ type: 'negative', message: errorMsg })
-  }
-}
-
-
-
+        // Oculta o formulário de criação
+        showCreateUser.value = false
+      } catch (err) {
+        console.error(err)
+        const errorMsg =
+          err.response?.data?.error || err.response?.data?.detail || 'Erro ao criar usuário'
+        $q.notify({ type: 'negative', message: errorMsg })
+      }
+    }
 
     return {
       searchQuery,
@@ -1102,14 +1094,14 @@ const createUser = async () => {
       removeSubscription,
 
       showCreateUser,
-  newUser,
-  createUser,
-  resetNewUser,
-  showCreateUserDialog,
-  birthYearOptions,
-  copyPassword
+      newUser,
+      createUser,
+      resetNewUser,
+      showCreateUserDialog,
+      birthYearOptions,
+      copyPassword,
     }
-  }
+  },
 }
 </script>
 
@@ -1119,12 +1111,16 @@ const createUser = async () => {
   background-color: #f5f7fa;
 }
 
-.search-card, .client-card, .edit-card, .empty-state-card {
+.search-card,
+.client-card,
+.edit-card,
+.empty-state-card {
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
-.client-card, .edit-card {
+.client-card,
+.edit-card {
   .q-card__section {
     padding: 24px;
   }
