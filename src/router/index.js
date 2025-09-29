@@ -5,6 +5,7 @@ import Users from '../pages/UsersPage.vue'
 import Login from '../pages/Login.vue'
 import Workers from '../pages/WorkersPage.vue'
 import Payments from '../pages/PaymentsPage.vue'
+import ranking from '../pages/RankingPage.vue'
 
 const routes = [
   {
@@ -14,7 +15,8 @@ const routes = [
       { path: '', component: () => import('pages/DashboardPage.vue') },
       { path: 'users', component: Users },
       { path: 'workers', component: Workers },
-      { path: 'payments', component: Payments }
+      { path: 'payments', component: Payments },
+      { path: 'ranking', component: ranking }
     ],
     meta: { requiresAuth: true }
   },

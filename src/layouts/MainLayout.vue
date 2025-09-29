@@ -113,6 +113,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/ranking" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="emoji_events" color="yellow-10" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Ranking</div>
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/payments" class="text-white">
             <q-item-section avatar>
               <q-icon name="paid" color="green-3" />
