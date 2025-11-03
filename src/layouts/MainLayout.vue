@@ -122,6 +122,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/videoManager" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="emoji_events" color="yellow-10" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Gestor de videos</div>
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/payments" class="text-white">
             <q-item-section avatar>
               <q-icon name="paid" color="green-3" />

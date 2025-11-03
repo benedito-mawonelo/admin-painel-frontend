@@ -6,6 +6,7 @@ import Login from '../pages/Login.vue'
 import Workers from '../pages/WorkersPage.vue'
 import Payments from '../pages/PaymentsPage.vue'
 import ranking from '../pages/RankingPage.vue'
+import videoManager from '../pages/VideoManager.vue'
 
 const routes = [
   {
@@ -16,7 +17,8 @@ const routes = [
       { path: 'users', component: Users },
       { path: 'workers', component: Workers },
       { path: 'payments', component: Payments },
-      { path: 'ranking', component: ranking }
+      { path: 'ranking', component: ranking },
+      { path: 'videoManager', component: videoManager }
     ],
     meta: { requiresAuth: true }
   },

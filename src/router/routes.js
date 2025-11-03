@@ -27,6 +27,13 @@ const routes = [
         name: 'payments',
         component: () => import('pages/PaymentsPage.vue'),
         meta: { icon: 'payments', label: 'Pagamentos' },
+      },
+
+     {
+        path: '/video-manager',
+        name: 'videoManager',
+        component: () => import('pages/VideoManager.vue'),
+        meta: { icon: 'ondemand_video', label: 'Gestor de Vídeos' }, // Ícone correto e acentuação
       }
 
     ],
