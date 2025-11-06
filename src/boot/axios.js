@@ -15,7 +15,8 @@ import { boot } from 'quasar/wrappers'
 import axios from 'axios'
 
 // const api = axios.create({ baseURL: 'http://localhost:8000/api' })
-const api = axios.create({ baseURL: 'https://mawoneloProd.pythonanywhere.com/api' })
+// const api = axios.create({ baseURL: 'https://mawoneloProd.pythonanywhere.com/api' })
+const api = axios.create({ baseURL: 'http://ec2-13-246-32-100.af-south-1.compute.amazonaws.com/api'})
 // const api = axios.create({ baseURL: 'http://localhost:9000/api' })
 
 
