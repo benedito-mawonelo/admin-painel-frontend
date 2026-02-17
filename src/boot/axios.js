@@ -15,7 +15,7 @@ import { boot } from 'quasar/wrappers'
 import axios from 'axios'
 
 // BaseURL: use variável VITE_API_URL (ex.: em .env) ou fallback para backend Carta Fácil local
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const baseURL = import.meta.env.VITE_API_URL || 'https://web-production-8746c.up.railway.app/api'
 const api = axios.create({ baseURL })
 
 
