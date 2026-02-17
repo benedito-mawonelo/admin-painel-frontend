@@ -90,20 +90,24 @@ export default {
     const login = async () => {
       loading.value = true
       try {
-        const response = await api.post('/api-token-auth/', {
+        // Carta Fácil: JWT em /api/auth/login/ → { access, refresh }
+        const response = await api.post('/auth/login/', {
           username: form.value.username,
           password: form.value.password
         })
-        localStorage.setItem('auth_token', response.data.token)
+        const { access, refresh } = response.data
+        localStorage.setItem('auth_token', access)
+        if (refresh) localStorage.setItem('auth_refresh_token', refresh)
         $q.notify({
           type: 'positive',
           message: 'Login realizado com sucesso!'
         })
         router.push('/')
       } catch (error) {
+        const msg = error.response?.data?.error || error.response?.data?.non_field_errors?.[0] || 'Erro ao fazer login'
         $q.notify({
           type: 'negative',
-          message: error.response?.data?.non_field_errors || 'Erro ao fazer login'
+          message: msg
         })
       } finally {
         loading.value = false

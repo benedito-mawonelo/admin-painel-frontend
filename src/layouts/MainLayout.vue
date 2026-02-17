@@ -198,14 +198,21 @@ export default {
     const leftDrawerOpen = ref(false)
     const user = ref(null)
 
-    // Carregar informações do usuário autenticado
+    // Carta Fácil: GET /api/me/ devolve user com first_name, last_name, image, etc.
     const loadUser = async () => {
       try {
-        const response = await api.get('/users/me/') // Assumindo que existe um endpoint para obter o usuário atual
-        user.value = response.data
+        const response = await api.get('/me/')
+        const data = response.data
+        // Normalizar para o layout (name, avatar) a partir do UserSerializer do backend
+        user.value = {
+          ...data,
+          name: [data.first_name, data.last_name].filter(Boolean).join(' ').trim() || data.username || 'Usuário',
+          avatar: data.image || null
+        }
       } catch (error) {
         console.error('Erro ao carregar usuário:', error)
         localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_refresh_token')
         router.push('/login')
       }
     }
@@ -221,6 +228,7 @@ export default {
 
     const logout = () => {
       localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_refresh_token')
       router.push('/login')
       $q.notify({
         type: 'positive',

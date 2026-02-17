@@ -14,30 +14,30 @@
 import { boot } from 'quasar/wrappers'
 import axios from 'axios'
 
-// const api = axios.create({ baseURL: 'http://localhost:8000/api' })
-const api = axios.create({ baseURL: 'https://mawoneloProd.pythonanywhere.com/api' })
-// const api = axios.create({ baseURL: 'http://ec2-13-246-32-100.af-south-1.compute.amazonaws.com/api'})
-// const api = axios.create({ baseURL: 'http://localhost:9000/api' })
+// BaseURL: use variável VITE_API_URL (ex.: em .env) ou fallback para backend Carta Fácil local
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const api = axios.create({ baseURL })
 
 
-// Interceptor para adicionar o token em todas as requisições
+// Interceptor: enviar JWT (Carta Fácil) como Bearer em todas as requisições
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('auth_token')
     if (token) {
-      config.headers.Authorization = `Token ${token}`
+      config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
   (error) => Promise.reject(error)
 )
 
-// Interceptor para lidar com erros 401 (Unauthorized)
+// Interceptor: em 401 limpar tokens e redirecionar para login
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_refresh_token')
       window.location.href = '/login'
     }
     return Promise.reject(error)

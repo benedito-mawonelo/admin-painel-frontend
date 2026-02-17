@@ -70,6 +70,23 @@
                   <q-icon name="phone" class="q-mr-xs" />
                   {{ clientData.telefone }}
                 </div>
+                <div class="text-subtitle2 q-mt-xs row items-center">
+                  <span class="text-grey-7">Senha:</span>
+                  <span class="q-ml-sm">{{ clientData.password || 'Não definida (use Editar para redefinir)' }}</span>
+                  <q-btn
+                    v-if="clientData.password"
+                    flat
+                    round
+                    dense
+                    size="sm"
+                    icon="content_copy"
+                    color="primary"
+                    class="q-ml-xs"
+                    @click="copyPassword(clientData.password)"
+                  >
+                    <q-tooltip>Copiar senha</q-tooltip>
+                  </q-btn>
+                </div>
               </div>
 
               <q-space />
@@ -252,11 +269,13 @@
                     <q-input
                       v-model="editForm.password"
                       outlined
-                      label="Senha"
+                      label="Senha actual (só leitura)"
                       readonly
                       class="col"
+                      :hint="editForm.password ? 'Senha guardada no sistema' : 'Sem senha guardada. Defina uma abaixo.'"
                     />
                     <q-btn
+                      v-if="editForm.password"
                       flat
                       round
                       icon="content_copy"
@@ -264,6 +283,26 @@
                       class="q-ml-sm"
                       @click="copyPassword(editForm.password)"
                       dense
+                    />
+                  </div>
+                  <div class="row items-center q-mb-md">
+                    <q-input
+                      v-model="editForm.newPassword"
+                      outlined
+                      type="password"
+                      label="Nova senha (redefinir)"
+                      placeholder="Mín. 6 caracteres"
+                      class="col"
+                      clearable
+                    />
+                    <q-btn
+                      label="Aplicar"
+                      color="primary"
+                      outline
+                      class="q-ml-sm"
+                      :loading="passwordLoading"
+                      :disable="!editForm.newPassword || editForm.newPassword.length < 6"
+                      @click="applyNewPassword"
                     />
                   </div>
 
@@ -575,6 +614,7 @@ export default {
     const activeSubscriptionTab = ref(0)
     const activeEditSubscriptionTab = ref(0)
     const addSubscriptionDialog = ref(false)
+    const originalPaymentIds = ref([])
 
     const newSubscription = ref({
       category: '',
@@ -595,7 +635,9 @@ export default {
       provincia: '',
       payments: [],
       password: '',
+      newPassword: '',
     })
+    const passwordLoading = ref(false)
 
     const planOptions = [
       'ganha-facil',
@@ -695,16 +737,18 @@ export default {
           'YYYY-MM-DD',
         )
 
-        // Adiciona a nova assinatura no array local
-        const updatedPayments = [...(clientData.value.payments || []), { ...newSubscription.value }]
-
-        // Envia para o servidor
-        await api.patch(`/clients/${clientData.value.id}/`, {
-          payments: updatedPayments,
+        // Carta Fácil: criar pagamento via endpoint admin
+        await api.post('/payments/admin/add/', {
+          user_id: clientData.value.id,
+          category: newSubscription.value.category,
+          start_at: newSubscription.value.startAt,
+          end_at: newSubscription.value.endAt,
+          phone_number: newSubscription.value.payedByNumber || clientData.value.telefone,
         })
 
-        // Atualiza local com sucesso
-        clientData.value.payments = updatedPayments
+        // Rebuscar user para actualizar lista de payments
+        const res = await api.get(`/users/${clientData.value.id}/`)
+        clientData.value = normalizeUser(res.data)
         addSubscriptionDialog.value = false
         $q.notify({
           type: 'positive',
@@ -714,7 +758,7 @@ export default {
         console.error('Erro ao adicionar assinatura:', err)
         $q.notify({
           type: 'negative',
-          message: 'Erro ao adicionar assinatura',
+          message: err.response?.data?.error || err.response?.data?.detail || 'Erro ao adicionar assinatura',
         })
       }
     }
@@ -765,6 +809,27 @@ export default {
       }
     }
 
+    // Normaliza user do Carta Fácil (first_name, last_name, payments com start_at/end_at) para o formato do painel
+    const normalizeUser = (data) => {
+      if (!data) return null
+      const payments = (data.payments || []).map((p) => ({
+        ...p,
+        startAt: p.start_at || p.startAt,
+        endAt: p.end_at || p.endAt,
+        payedByNumber: p.phone_number || p.payedByNumber || data.telefone,
+      }))
+      return {
+        ...data,
+        name: [data.first_name, data.last_name].filter(Boolean).join(' ').trim() || data.username || 'Usuário',
+        birthYear: data.birth_year ?? data.birthYear,
+        createdAt: data.date_joined || data.createdAt,
+        password: data.password_debug ?? data.password ?? '',
+       
+        payments,
+      }
+    
+    }
+
     const searchClient = async () => {
       if (!searchQuery.value) {
         $q.notify({
@@ -778,12 +843,10 @@ export default {
 
       try {
         const response = await api.get(
-          `/clients/filter/?telefone=${encodeURIComponent(searchQuery.value)}`,
+          `/users/filter/?telefone=${encodeURIComponent(searchQuery.value)}`,
         )
-        console.log('API response:', response.data)
-
         if (Array.isArray(response.data) && response.data.length > 0) {
-          clientData.value = response.data[0]
+          clientData.value = normalizeUser(response.data[0])
           $q.notify({
             type: 'positive',
             message: 'Usuário encontrado com sucesso!',
@@ -800,7 +863,7 @@ export default {
         clientData.value = null
         $q.notify({
           type: 'negative',
-          message: 'Erro ao buscar usuário',
+          message: err.response?.data?.error || err.response?.data?.detail || 'Erro ao buscar usuário',
         })
       } finally {
         searchLoading.value = false
@@ -817,6 +880,7 @@ export default {
     const enterEditMode = () => {
       if (!clientData.value) return
 
+      const payments = clientData.value.payments ? [...clientData.value.payments] : []
       editForm.value = {
         id: clientData.value.id,
         name: clientData.value.name,
@@ -827,14 +891,40 @@ export default {
         gender: clientData.value.gender,
         birthYear: clientData.value.birthYear,
         provincia: clientData.value.provincia,
-        payments: clientData.value.payments ? [...clientData.value.payments] : [],
+        payments,
         password: clientData.value.password || '',
+        newPassword: '',
       }
+      originalPaymentIds.value = payments.map((p) => p.id).filter(Boolean)
       editMode.value = true
     }
 
     const cancelEdit = () => {
       editMode.value = false
+    }
+
+    const applyNewPassword = async () => {
+      if (!editForm.value.newPassword || editForm.value.newPassword.length < 6) {
+        $q.notify({ type: 'warning', message: 'Nova senha deve ter pelo menos 6 caracteres.' })
+        return
+      }
+      passwordLoading.value = true
+      try {
+        await api.patch(`/users/${editForm.value.id}/`, { password: editForm.value.newPassword })
+        editForm.value.password = editForm.value.newPassword
+        editForm.value.newPassword = ''
+        if (clientData.value && clientData.value.id === editForm.value.id) {
+          clientData.value.password = editForm.value.password
+        }
+        $q.notify({ type: 'positive', message: 'Senha actualizada. O utilizador já pode usar esta senha para entrar.' })
+      } catch (err) {
+        $q.notify({
+          type: 'negative',
+          message: err.response?.data?.error || err.response?.data?.detail || 'Erro ao redefinir senha',
+        })
+      } finally {
+        passwordLoading.value = false
+      }
     }
 
     const saveChanges = async () => {
@@ -849,11 +939,42 @@ export default {
           gender: editForm.value.gender,
           birthYear: editForm.value.birthYear,
           provincia: editForm.value.provincia,
-          payments: editForm.value.payments,
         }
 
-        await api.patch(`/clients/${editForm.value.id}/`, payload)
-        clientData.value = { ...clientData.value, ...editForm.value }
+        await api.patch(`/users/${editForm.value.id}/`, payload)
+
+        const currentPayments = editForm.value.payments || []
+        const originalIds = originalPaymentIds.value
+        const toDeleteIds = originalIds.filter((id) => !currentPayments.some((p) => p.id === id))
+        const toUpdate = currentPayments.filter((p) => p.id)
+        const toCreate = currentPayments.filter((p) => !p.id)
+
+        for (const id of toDeleteIds) {
+          await api.delete(`/payments/admin/${id}/delete/`)
+        }
+        for (const p of toUpdate) {
+          await api.patch(`/payments/admin/${p.id}/`, {
+            category: p.category,
+            start_at: p.startAt || p.start_at,
+            end_at: p.endAt || p.end_at,
+            phone_number: p.payedByNumber || p.phone_number || undefined,
+            amount: p.amount,
+          })
+        }
+        for (const p of toCreate) {
+          if (p.category && (p.endAt || p.end_at)) {
+            await api.post('/payments/admin/add/', {
+              user_id: editForm.value.id,
+              category: p.category,
+              start_at: p.startAt || p.start_at,
+              end_at: p.endAt || p.end_at,
+              phone_number: p.payedByNumber || p.phone_number || undefined,
+            })
+          }
+        }
+
+        const response = await api.get(`/users/${editForm.value.id}/`)
+        clientData.value = normalizeUser(response.data)
         editMode.value = false
         $q.notify({
           type: 'positive',
@@ -863,7 +984,7 @@ export default {
         console.error('Erro ao salvar:', err)
         $q.notify({
           type: 'negative',
-          message: 'Erro ao salvar alterações',
+          message: err.response?.data?.error || err.response?.data?.detail || 'Erro ao salvar alterações',
         })
       } finally {
         saveLoading.value = false
@@ -1043,15 +1164,21 @@ export default {
       }
 
       try {
-        const response = await api.post('/client/register/', newUser.value)
+        // Carta Fácil: POST /api/auth/register/ → { user, access, refresh }
+        const response = await api.post('/auth/register/', {
+          name: newUser.value.name,
+          apelido: newUser.value.apelido,
+          telefone: newUser.value.telefone,
+          email: newUser.value.email || undefined,
+          password: newUser.value.password,
+        })
+        const created = response.data?.user
+        clientData.value = normalizeUser(created)
         $q.notify({
           type: 'positive',
-          message: response.data?.message || 'Usuário criado com sucesso!',
+          message: 'Usuário criado com sucesso!',
         })
-        clientData.value = response.data
         resetNewUser()
-
-        // Oculta o formulário de criação
         showCreateUser.value = false
       } catch (err) {
         console.error(err)
@@ -1081,6 +1208,8 @@ export default {
       enterEditMode,
       cancelEdit,
       saveChanges,
+      passwordLoading,
+      applyNewPassword,
       triggerFileInput,
       handleFileUpload,
       formatDate,
