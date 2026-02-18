@@ -49,6 +49,24 @@
                 />
               </div>
             </div>
+
+            <!-- Últimos 10 números pesquisados (últimas 24h) -->
+            <div v-if="recentSearches.length" class="q-mt-md">
+              <div class="text-caption text-grey-7 q-mb-xs">Últimas pesquisas (24h):</div>
+              <div class="row q-gutter-xs">
+                <q-btn
+                  v-for="item in recentSearches"
+                  :key="item.q + item.at"
+                  dense
+                  flat
+                  no-caps
+                  size="sm"
+                  color="primary"
+                  :label="item.q"
+                  @click="searchFromRecent(item.q)"
+                />
+              </div>
+            </div>
           </q-card-section>
         </q-card>
       </div>
@@ -170,6 +188,19 @@
                           <div class="col-4 col-md-2 text-grey-7">Dias restantes:</div>
                           <div class="col-8 col-md-4">
                             {{ getDaysRemaining(subscription.endAt) }}
+                          </div>
+                        </div>
+
+                        <div class="row q-mt-md">
+                          <div class="col-12">
+                            <q-btn
+                              color="primary"
+                              outline
+                              label="Acrescentar dias"
+                              icon="add"
+                              size="sm"
+                              @click="openAddDaysDialog(subscription)"
+                            />
                           </div>
                         </div>
                       </div>
@@ -461,6 +492,43 @@
       </div>
     </div>
 
+    <!-- Dialog para acrescentar dias a uma assinatura -->
+    <q-dialog v-model="addDaysDialog" persistent>
+      <q-card style="min-width: 360px">
+        <q-card-section>
+          <div class="text-h6">Acrescentar dias</div>
+          <div class="text-caption text-grey-7">
+            Dias promocionais ou cortesia. Se a assinatura já expirou, os dias contam a partir de hoje.
+          </div>
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <q-input
+            v-model.number="addDaysForm.days"
+            outlined
+            label="Número de dias"
+            type="number"
+            min="1"
+            max="730"
+            :rules="[(v) => v >= 1 && v <= 730 || 'Entre 1 e 730']"
+            class="q-mb-md"
+          />
+          <q-select
+            v-model="addDaysForm.reason"
+            outlined
+            label="Motivo (opcional)"
+            :options="addDaysReasonOptions"
+            clearable
+            emit-value
+            map-options
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" color="grey" v-close-popup />
+          <q-btn label="Aplicar" color="primary" @click="confirmAddDays" :loading="addDaysLoading" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <!-- Dialog para adicionar nova assinatura -->
     <q-dialog v-model="addSubscriptionDialog">
       <q-card style="min-width: 400px">
@@ -597,7 +665,8 @@
 </template>
 
 <script>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { api } from 'boot/axios'
 import { useQuasar } from 'quasar'
 import { date } from 'quasar'
@@ -605,6 +674,8 @@ import { date } from 'quasar'
 export default {
   setup() {
     const $q = useQuasar()
+    const router = useRouter()
+    const route = useRoute()
     const searchQuery = ref('')
     const searchLoading = ref(false)
     const clientData = ref(null)
@@ -615,6 +686,18 @@ export default {
     const activeEditSubscriptionTab = ref(0)
     const addSubscriptionDialog = ref(false)
     const originalPaymentIds = ref([])
+    const addDaysDialog = ref(false)
+    const addDaysLoading = ref(false)
+    const selectedPaymentForAddDays = ref(null)
+    const addDaysForm = ref({
+      days: 7,
+      reason: '',
+    })
+    const addDaysReasonOptions = [
+      { label: 'Promocional', value: 'promocional' },
+      { label: 'Cortesia', value: 'cortesia' },
+      { label: 'Outro', value: 'outro' },
+    ]
 
     const newSubscription = ref({
       category: '',
@@ -647,6 +730,65 @@ export default {
       'ligeiro_pesado',
       'videos-practical-ligeiro',
     ]
+
+    const RECENT_SEARCHES_KEY = 'admin_users_recent_searches'
+    const RECENT_SEARCHES_MAX = 10
+    const RECENT_SEARCHES_MS = 24 * 60 * 60 * 1000 // 24 horas
+
+    const getRecentSearchesRaw = () => {
+      try {
+        const raw = localStorage.getItem(RECENT_SEARCHES_KEY)
+        return raw ? JSON.parse(raw) : []
+      } catch {
+        return []
+      }
+    }
+
+    const saveRecentSearches = (list) => {
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list))
+      } catch (e) {
+        console.warn('Não foi possível guardar pesquisas recentes', e)
+      }
+    }
+
+    const addToRecentSearches = (query) => {
+      const q = (query || '').toString().trim()
+      if (!q) return
+      const now = Date.now()
+      let list = getRecentSearchesRaw()
+      list = list.filter((item) => item.at > now - RECENT_SEARCHES_MS)
+      list.unshift({ q, at: now })
+      const seen = new Set()
+      list = list.filter((item) => {
+        if (seen.has(item.q)) return false
+        seen.add(item.q)
+        return true
+      })
+      list = list.slice(0, RECENT_SEARCHES_MAX)
+      saveRecentSearches(list)
+    }
+
+    const recentSearches = ref([])
+
+    const refreshRecentSearches = () => {
+      const now = Date.now()
+      let list = getRecentSearchesRaw().filter((item) => item.at > now - RECENT_SEARCHES_MS)
+      const seen = new Set()
+      list = list.filter((item) => {
+        if (seen.has(item.q)) return false
+        seen.add(item.q)
+        return true
+      })
+      list = list.slice(0, RECENT_SEARCHES_MAX)
+      saveRecentSearches(list)
+      recentSearches.value = list
+    }
+
+    const searchFromRecent = (query) => {
+      searchQuery.value = query
+      searchClient()
+    }
 
     const genderOptions = ['Masculino', 'Feminino', 'Outro']
     const provinceOptions = [
@@ -691,6 +833,49 @@ export default {
             message: 'Não foi possível copiar a senha.',
           })
         })
+    }
+
+    const openAddDaysDialog = (subscription) => {
+      if (!subscription || !subscription.id) {
+        $q.notify({ type: 'warning', message: 'Esta assinatura não permite acrescentar dias.' })
+        return
+      }
+      selectedPaymentForAddDays.value = subscription
+      addDaysForm.value = { days: 7, reason: '' }
+      addDaysDialog.value = true
+    }
+
+    const confirmAddDays = async () => {
+      const payment = selectedPaymentForAddDays.value
+      if (!payment || !clientData.value) return
+      const days = addDaysForm.value.days
+      if (!days || days < 1 || days > 730) {
+        $q.notify({ type: 'warning', message: 'Indique entre 1 e 730 dias.' })
+        return
+      }
+      addDaysLoading.value = true
+      try {
+        await api.post(`/payments/admin/${payment.id}/add_days/`, {
+          days,
+          reason: addDaysForm.value.reason || undefined,
+        })
+        const res = await api.get(`/users/${clientData.value.id}/`)
+        clientData.value = normalizeUser(res.data)
+        addDaysDialog.value = false
+        selectedPaymentForAddDays.value = null
+        $q.notify({
+          type: 'positive',
+          message: `${days} dia(s) acrescentado(s) com sucesso.`,
+        })
+      } catch (err) {
+        console.error('Erro ao acrescentar dias:', err)
+        $q.notify({
+          type: 'negative',
+          message: err.response?.data?.error || err.response?.data?.detail || 'Erro ao acrescentar dias.',
+        })
+      } finally {
+        addDaysLoading.value = false
+      }
     }
 
     const showAddSubscriptionDialog = () => {
@@ -847,12 +1032,19 @@ export default {
         )
         if (Array.isArray(response.data) && response.data.length > 0) {
           clientData.value = normalizeUser(response.data[0])
+          addToRecentSearches(searchQuery.value)
+          refreshRecentSearches()
+          router.replace({
+            path: route.path,
+            query: { user_id: clientData.value.id, q: searchQuery.value },
+          })
           $q.notify({
             type: 'positive',
             message: 'Usuário encontrado com sucesso!',
           })
         } else {
           clientData.value = null
+          router.replace({ path: route.path, query: { q: searchQuery.value } })
           $q.notify({
             type: 'warning',
             message: 'Nenhum usuário encontrado',
@@ -870,12 +1062,48 @@ export default {
       }
     }
 
+    const loadUserById = async (userId) => {
+      if (!userId) return
+      searchLoading.value = true
+      try {
+        const response = await api.get(`/users/${userId}/`)
+        clientData.value = normalizeUser(response.data)
+        searchQuery.value = response.data.telefone || response.data.id || ''
+        router.replace({
+          path: route.path,
+          query: { user_id: userId, q: searchQuery.value },
+        })
+      } catch (err) {
+        console.error('Erro ao carregar usuário:', err)
+        clientData.value = null
+        $q.notify({
+          type: 'negative',
+          message: err.response?.data?.error || err.response?.data?.detail || 'Erro ao carregar usuário',
+        })
+      } finally {
+        searchLoading.value = false
+      }
+    }
+
     const resetSearch = () => {
       searchQuery.value = ''
       clientData.value = null
       editMode.value = false
       showCreateUser.value = false
+      router.replace({ path: route.path, query: {} })
     }
+
+    onMounted(() => {
+      refreshRecentSearches()
+      const userId = route.query.user_id
+      const q = route.query.q
+      if (userId) {
+        loadUserById(userId)
+      } else if (q) {
+        searchQuery.value = q
+        searchClient()
+      }
+    })
 
     const enterEditMode = () => {
       if (!clientData.value) return
@@ -1122,6 +1350,7 @@ export default {
       clientData.value = null
       editMode.value = false
       showCreateUser.value = true
+      router.replace({ path: route.path, query: {} })
     }
 
     // const createUser = async () => {
@@ -1229,6 +1458,17 @@ export default {
       showCreateUserDialog,
       birthYearOptions,
       copyPassword,
+
+      addDaysDialog,
+      addDaysForm,
+      addDaysReasonOptions,
+      addDaysLoading,
+      openAddDaysDialog,
+      confirmAddDays,
+      loadUserById,
+
+      recentSearches,
+      searchFromRecent,
     }
   },
 }
