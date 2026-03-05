@@ -28,6 +28,12 @@ const routes = [
         component: () => import('pages/PaymentsPage.vue'),
         meta: { icon: 'payments', label: 'Pagamentos' },
       },
+      {
+        path: '/relatorios',
+        name: 'relatorios',
+        component: () => import('src/pages/UsersNoPaymentsPage.vue'),
+        meta: { icon: 'assessment', label: 'Relatórios' },
+      },
 
      {
         path: '/video-manager',
