@@ -2,8 +2,9 @@ import { boot } from 'quasar/wrappers'
 import axios from 'axios'
 
 const api = axios.create({
-  // https://web-production-8746c.up.railway.app/api
-  baseURL: process.env.API_URL || 'http://localhost:8000/api',
+  baseURL: process.env.API_URL || 'https://web-production-8746c.up.railway.app/api',
+    // baseURL: process.env.API_URL || 'http://localhost:8000/api',
+
   withCredentials: true,
   headers: {
     'Accept': 'application/json',
