@@ -12,7 +12,7 @@
                 <q-input
                   v-model="searchQuery"
                   outlined
-                  label="Telefone, Nome ou ID"
+                  label="Telefone, Nome, ID ou Número de Pagamento"
                   placeholder="Digite para pesquisar"
                   clearable
                   @keyup.enter="searchClient"
@@ -147,7 +147,7 @@
                       :key="index"
                       :name="index"
                     >
-                      <div class="subscription-info">
+                      <div class="subscription-info" :class="{ 'expired': !isDateFuture(subscription.endAt) }">
                         <div class="row items-center q-mb-sm">
                           <div class="col-4 col-md-2 text-grey-7">Plano:</div>
                           <div class="col-8 col-md-4 text-weight-bold text-capitalize">
@@ -179,6 +179,7 @@
                               :class="{
                                 'text-positive': isDateFuture(subscription.endAt),
                                 'text-negative': !isDateFuture(subscription.endAt),
+                                'text-weight-bold': !isDateFuture(subscription.endAt)
                               }"
                             >
                               {{ formatDate(subscription.endAt) }}
@@ -187,7 +188,9 @@
 
                           <div class="col-4 col-md-2 text-grey-7">Dias restantes:</div>
                           <div class="col-8 col-md-4">
-                            {{ getDaysRemaining(subscription.endAt) }}
+                            <span :class="{ 'text-negative': getDaysRemainingNumber(subscription.endAt) <= 0 }">
+                              {{ getDaysRemaining(subscription.endAt) }}
+                            </span>
                           </div>
                         </div>
 
@@ -215,7 +218,6 @@
 
           <q-card-actions align="right">
             <q-btn color="primary" label="Editar Perfil" outline @click="enterEditMode" />
-
             <q-btn color="primary" label="Enviar Mensagem" />
             <q-btn
               color="secondary"
@@ -288,13 +290,6 @@
                       (val) => val.length >= 8 || 'Telefone inválido',
                     ]"
                   />
-                  <!-- <q-input
-                    v-model="editForm.password"
-                    outlined
-                    label="Senha"
-                    class="q-mb-md"
-                    readonly
-                  /> -->
 
                   <div class="row items-center q-mb-md">
                     <q-input
@@ -486,7 +481,7 @@
           <q-card-section class="text-center">
             <q-icon name="search_off" size="xl" color="grey-5" class="q-mb-md" />
             <h3 class="text-h5 text-weight-bold q-mb-sm">Nenhum usuário seleccionado</h3>
-            <p class="text-grey-7">Digite um telefone, nome ou ID para pesquisar um cliente</p>
+            <p class="text-grey-7">Digite um telefone, nome, ID ou número de pagamento para pesquisar um cliente</p>
           </q-card-section>
         </q-card>
       </div>
@@ -580,31 +575,6 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-
-    <!-- <q-dialog v-model="createUserDialog">
-  <q-card style="min-width: 400px">
-    <q-card-section>
-      <div class="text-h6">Criar Nova Conta</div>
-    </q-card-section>
-
-    <q-card-section class="q-pt-none">
-      <q-input v-model="newUser.name" outlined label="Nome" class="q-mb-md" />
-      <q-input v-model="newUser.apelido" outlined label="Apelido" class="q-mb-md" />
-      <q-input v-model="newUser.telefone" outlined label="Telefone" mask="###########" class="q-mb-md" />
-      <q-input v-model="newUser.email" outlined label="Email" type="email" class="q-mb-md" />
-      <q-input v-model="newUser.password" outlined label="Senha" type="password" class="q-mb-md" />
-
-      <q-select v-model="newUser.gender" outlined label="Gênero" :options="genderOptions" class="q-mb-md" />
-      <q-input v-model="newUser.birthYear" outlined label="Ano de Nascimento" type="number" class="q-mb-md" />
-      <q-select v-model="newUser.provincia" outlined label="Província" :options="provinceOptions" class="q-mb-md" />
-    </q-card-section>
-
-    <q-card-actions align="right">
-      <q-btn flat label="Cancelar" color="negative" v-close-popup />
-      <q-btn label="Criar" color="positive" @click="createUser" />
-    </q-card-actions>
-  </q-card>
-</q-dialog> -->
 
     <!-- Formulário de Criação de Usuário -->
     <div class="col-12" v-if="showCreateUser">
@@ -980,14 +950,6 @@ export default {
     )
 
     const removeSubscription = (index) => {
-      // if (editForm.value.payments.length <= 1) {
-      //   $q.notify({
-      //     type: 'warning',
-      //     message: 'O usuário deve ter pelo menos uma assinatura'
-      //   })
-      //   return
-      // }
-
       editForm.value.payments.splice(index, 1)
       if (activeEditSubscriptionTab.value >= editForm.value.payments.length) {
         activeEditSubscriptionTab.value = editForm.value.payments.length - 1
@@ -1009,17 +971,15 @@ export default {
         birthYear: data.birth_year ?? data.birthYear,
         createdAt: data.date_joined || data.createdAt,
         password: data.password_debug ?? data.password ?? '',
-       
         payments,
       }
-    
     }
 
     const searchClient = async () => {
       if (!searchQuery.value) {
         $q.notify({
           type: 'warning',
-          message: 'Digite um telefone, nome ou ID para pesquisar',
+          message: 'Digite um telefone, nome, ID ou número de pagamento para pesquisar',
         })
         return
       }
@@ -1027,9 +987,11 @@ export default {
       searchLoading.value = true
 
       try {
+        // Primeiro tenta buscar por telefone/nome/id
         const response = await api.get(
           `/users/filter/?telefone=${encodeURIComponent(searchQuery.value)}`,
         )
+
         if (Array.isArray(response.data) && response.data.length > 0) {
           clientData.value = normalizeUser(response.data[0])
           addToRecentSearches(searchQuery.value)
@@ -1043,12 +1005,42 @@ export default {
             message: 'Usuário encontrado com sucesso!',
           })
         } else {
+          // Se não encontrar por telefone/nome, tenta buscar por número de pagamento
+          try {
+            const paymentResponse = await api.get('/payments/external/', {
+              params: { phone: searchQuery.value }
+            })
+
+            if (paymentResponse.data.payments && paymentResponse.data.payments.length > 0) {
+              // Encontrou pagamentos com este número
+              $q.notify({
+                type: 'info',
+                message: `Encontrados ${paymentResponse.data.payments.length} pagamento(s) com este número. Vá para a página de Pagamentos para associar.`,
+                actions: [
+                  {
+                    label: 'Ir para Pagamentos',
+                    color: 'white',
+                    handler: () => {
+                      router.push('/payments?phone=' + searchQuery.value)
+                    }
+                  }
+                ]
+              })
+            } else {
+              $q.notify({
+                type: 'warning',
+                message: 'Nenhum usuário ou pagamento encontrado com este número',
+              })
+            }
+          } catch (paymentErr) {
+            console.error('Erro ao buscar pagamentos:', paymentErr)
+            $q.notify({
+              type: 'warning',
+              message: 'Nenhum usuário encontrado',
+            })
+          }
           clientData.value = null
           router.replace({ path: route.path, query: { q: searchQuery.value } })
-          $q.notify({
-            type: 'warning',
-            message: 'Nenhum usuário encontrado',
-          })
         }
       } catch (err) {
         console.error('Erro na busca:', err)
@@ -1244,13 +1236,15 @@ export default {
       return new Date(dateString) > new Date()
     }
 
-    const getDaysRemaining = (endDate) => {
-      if (!endDate) return '-'
+    const getDaysRemainingNumber = (endDate) => {
+      if (!endDate) return 0
       const today = new Date()
       const end = new Date(endDate)
-      const diff = end - today
-      const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+      return Math.ceil((end - today) / (1000 * 60 * 60 * 24))
+    }
 
+    const getDaysRemaining = (endDate) => {
+      const days = getDaysRemainingNumber(endDate)
       if (days > 0) {
         return `${days} dias`
       } else if (days === 0) {
@@ -1269,49 +1263,6 @@ export default {
       if (!subscription.endAt) return 'grey'
       return isDateFuture(subscription.endAt) ? 'positive' : 'negative'
     }
-
-    //     const createUserDialog = ref(false)
-    // const newUser = ref({
-    //   name: '',
-    //   apelido: '',
-    //   telefone: '',
-    //   email: '',
-    //   password: '',
-    //   gender: '',
-    //   birthYear: '',
-    //   provincia: ''
-    // })
-
-    // const showCreateUserDialog = () => {
-    //   createUserDialog.value = true
-    //   newUser.value = {
-    //     name: '',
-    //     apelido: '',
-    //     telefone: '',
-    //     email: '',
-    //     password: '',
-    //     gender: '',
-    //     birthYear: '',
-    //     provincia: ''
-    //   }
-    // }
-
-    // const createUser = async () => {
-    //   if (!newUser.value.telefone || !newUser.value.password) {
-    //     $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
-    //     return
-    //   }
-
-    //   try {
-    //     const response = await api.post('/client/register/', newUser.value)
-    //     $q.notify({ type: 'positive', message: 'Usuário criado com sucesso!' })
-    //     createUserDialog.value = false
-    //     clientData.value = response.data
-    //   } catch (err) {
-    //     console.error(err)
-    //     $q.notify({ type: 'negative', message: 'Erro ao criar usuário' })
-    //   }
-    // }
 
     const showCreateUser = ref(false)
 
@@ -1345,41 +1296,13 @@ export default {
     }
 
     const showCreateUserDialog = () => {
-      resetNewUser() // opcional, limpa o formulário
+      resetNewUser()
       searchQuery.value = ''
       clientData.value = null
       editMode.value = false
       showCreateUser.value = true
       router.replace({ path: route.path, query: {} })
     }
-
-    // const createUser = async () => {
-    //   if (!newUser.value.telefone || !newUser.value.password) {
-    //     $q.notify({ type: 'negative', message: 'Telefone e senha são obrigatórios!' })
-    //     return
-    //   }
-
-    //   try {
-    //     const response = await api.post('/client/register/', newUser.value)
-
-    //     $q.notify({
-    //       type: 'positive',
-    //       message: response.data?.message || 'Usuário criado com sucesso!'
-    //     })
-
-    //     clientData.value = response.data
-    //     resetNewUser()
-    //   } catch (err) {
-    //     console.error(err)
-
-    //     const errorMsg =
-    //       err.response?.data?.error ||
-    //       err.response?.data?.detail ||
-    //       'Erro ao criar usuário'
-
-    //     $q.notify({ type: 'negative', message: errorMsg })
-    //   }
-    // }
 
     const createUser = async () => {
       if (!newUser.value.telefone || !newUser.value.password) {
@@ -1393,7 +1316,6 @@ export default {
       }
 
       try {
-        // Carta Fácil: POST /api/auth/register/ → { user, access, refresh }
         const response = await api.post('/auth/register/', {
           name: newUser.value.name,
           apelido: newUser.value.apelido,
@@ -1444,13 +1366,13 @@ export default {
       formatDate,
       isDateFuture,
       getDaysRemaining,
+      getDaysRemainingNumber,
       getSubscriptionStatus,
       getSubscriptionStatusColor,
       showAddSubscriptionDialog,
       confirmAddSubscription,
       addNewSubscription,
       removeSubscription,
-
       showCreateUser,
       newUser,
       createUser,
@@ -1458,7 +1380,6 @@ export default {
       showCreateUserDialog,
       birthYearOptions,
       copyPassword,
-
       addDaysDialog,
       addDaysForm,
       addDaysReasonOptions,
@@ -1466,7 +1387,6 @@ export default {
       openAddDaysDialog,
       confirmAddDays,
       loadUserById,
-
       recentSearches,
       searchFromRecent,
     }
@@ -1513,9 +1433,19 @@ export default {
   border-radius: 8px;
   padding: 16px;
   border-left: 4px solid $primary;
+
+  &.expired {
+    background: rgba(244, 67, 54, 0.05);
+    border-left-color: $negative;
+  }
 }
 
 .q-tab--active {
   background-color: rgba(25, 118, 210, 0.1);
+}
+
+.text-negative {
+  color: $negative !important;
+  font-weight: 500;
 }
 </style>
