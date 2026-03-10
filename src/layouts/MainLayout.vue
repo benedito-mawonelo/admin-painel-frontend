@@ -150,6 +150,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/pagamentos-falhados" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="report_problem" color="red-4" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Pagamentos falhados</div>
+            </q-item-section>
+          </q-item>
+
           <q-separator color="grey-8" class="q-my-md" />
 
           <q-item-label header class="text-uppercase text-grey-5 q-pl-md">
