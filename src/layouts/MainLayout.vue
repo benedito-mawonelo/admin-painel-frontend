@@ -67,6 +67,7 @@
       bordered
       :width="280"
       class="bg-green-10 text-white"
+      :breakpoint="1024"
     >
       <q-scroll-area class="fit">
         <div class="q-pa-md text-center q-mb-md">
@@ -140,6 +141,24 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/relatorios" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="person_off" color="orange-3" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Utilizadores sem pagamento</div>
+            </q-item-section>
+          </q-item>
+
+          <q-item clickable v-ripple to="/pagamentos-falhados" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="report_problem" color="red-4" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Pagamentos falhados</div>
+            </q-item-section>
+          </q-item>
+
           <q-separator color="grey-8" class="q-my-md" />
 
           <q-item-label header class="text-uppercase text-grey-5 q-pl-md">
@@ -195,7 +214,8 @@ export default {
   setup() {
     const $q = useQuasar()
     const router = useRouter()
-    const leftDrawerOpen = ref(false)
+    // Menu lateral aberto por defeito para ser visível ao entrar (clicar no ☰ no header para abrir/fechar)
+    const leftDrawerOpen = ref(true)
     const user = ref(null)
 
     // Carta Fácil: GET /api/me/ devolve user com first_name, last_name, image, etc.

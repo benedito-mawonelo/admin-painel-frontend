@@ -18,7 +18,9 @@ const routes = [
       { path: 'workers', component: Workers },
       { path: 'payments', component: Payments },
       { path: 'ranking', component: ranking },
-      { path: 'videoManager', component: videoManager }
+      { path: 'videoManager', component: videoManager },
+      { path: 'relatorios', component: () => import('src/pages/UsersNoPaymentsPage.vue') },
+      { path: 'pagamentos-falhados', component: () => import('src/pages/FailedPaymentsPage.vue') }
     ],
     meta: { requiresAuth: true }
   },
