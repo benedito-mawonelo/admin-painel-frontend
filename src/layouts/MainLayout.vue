@@ -159,6 +159,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/users-firebase" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="cloud" color="light-blue-3" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Utilizadores Firebase</div>
+            </q-item-section>
+          </q-item>
+
           <q-separator color="grey-8" class="q-my-md" />
 
           <q-item-label header class="text-uppercase text-grey-5 q-pl-md">
