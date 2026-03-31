@@ -64,6 +64,21 @@
           :rows-per-page-options="[10, 25, 50]"
           class="sticky-header-table"
         >
+        <template v-slot:body-cell-account_name="props">
+        <q-td :props="props">
+          <span v-if="props.row.account_name" class="text-weight-medium">
+            {{ props.row.account_name }}
+          </span>
+          <span v-else class="text-grey-5">—</span>
+        </q-td>
+      </template>
+
+      <template v-slot:body-cell-account_phone="props">
+        <q-td :props="props">
+          <span v-if="props.row.account_phone">{{ props.row.account_phone }}</span>
+          <span v-else class="text-grey-5">—</span>
+        </q-td>
+      </template>
           <template v-slot:body-cell-created_at="props">
             <q-td :props="props">{{ formatDate(props.row.created_at) }}</q-td>
           </template>
@@ -114,13 +129,23 @@ import { ref, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from 'boot/axios'
 
+// const columns = [
+//   { name: 'phone_number', label: 'Telefone', field: 'phone_number', align: 'left', sortable: true },
+//   { name: 'amount', label: 'Valor (MT)', field: 'amount', align: 'right', sortable: true },
+//   { name: 'payment_method', label: 'Método', field: 'payment_method', align: 'left' },
+//   { name: 'created_at', label: 'Data da tentativa', field: 'created_at', align: 'left', sortable: true },
+//   { name: 'failure_reason', label: 'Motivo da falha', field: 'failure_reason', align: 'left' },
+//   { name: 'assistencia', label: 'Assistência', field: 'assisted_by_name', align: 'left' },
+// ]
 const columns = [
-  { name: 'phone_number', label: 'Telefone', field: 'phone_number', align: 'left', sortable: true },
-  { name: 'amount', label: 'Valor (MT)', field: 'amount', align: 'right', sortable: true },
-  { name: 'payment_method', label: 'Método', field: 'payment_method', align: 'left' },
-  { name: 'created_at', label: 'Data da tentativa', field: 'created_at', align: 'left', sortable: true },
-  { name: 'failure_reason', label: 'Motivo da falha', field: 'failure_reason', align: 'left' },
-  { name: 'assistencia', label: 'Assistência', field: 'assisted_by_name', align: 'left' },
+  { name: 'account_name',   label: 'Nome da conta',     field: 'account_name',   align: 'left', sortable: true },
+  { name: 'account_phone',  label: 'Nº da conta',       field: 'account_phone',  align: 'left' },
+  { name: 'phone_number',   label: 'Telefone pagamento', field: 'phone_number',  align: 'left', sortable: true },
+  { name: 'amount',         label: 'Valor (MT)',         field: 'amount',         align: 'right', sortable: true },
+  { name: 'payment_method', label: 'Método',             field: 'payment_method', align: 'left' },
+  { name: 'created_at',     label: 'Data da tentativa',  field: 'created_at',     align: 'left', sortable: true },
+  { name: 'failure_reason', label: 'Motivo da falha',    field: 'failure_reason', align: 'left' },
+  { name: 'assistencia',    label: 'Assistência',        field: 'assisted_by_name', align: 'left' },
 ]
 
 export default {

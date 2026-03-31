@@ -16,7 +16,7 @@ import axios from 'axios'
 
 // BaseURL: use variável VITE_API_URL (ex.: em .env) ou fallback para backend Carta Fácil local
 // const baseURL = import.meta.env.VITE_API_URL || 'https://web-production-8746c.up.railway.app/api'
-const baseURL = import.meta.env.VITE_API_UR || 'http://19.168.1.27:8001/api'
+const baseURL = import.meta.env.VITE_API_UR || 'http://192.168.1.27:8001/api'
 // const baseURL = import.meta.env.VITE_API_URL || 'http://192.168.1.118:8010/api'
 const api = axios.create({ baseURL })
 
