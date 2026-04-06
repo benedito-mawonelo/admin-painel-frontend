@@ -29,12 +29,7 @@ const routes = [
     path: '/login',
     component: Login,
     meta: { requiresAuth: false }
-  },
-  // {
-  //   path: '/forgot-password',
-  //   component: () => import('pages/ForgotPassword.vue'), // Placeholder para futura implementação
-  //   meta: { requiresAuth: false }
-  // }
+  }
 ]
 
 const router = createRouter({

@@ -1,12 +1,10 @@
 <template>
   <q-page class="payments-page q-pa-lg">
-    <!-- Cabeçalho -->
     <div class="text-h4 text-weight-bold q-mb-md flex items-center">
       <q-icon name="payments" size="md" class="q-mr-sm text-primary" />
       Gestão de Pagamentos
     </div>
 
-    <!-- Card de Pesquisa Externa -->
     <q-card class="external-payments-card q-mb-lg">
       <q-card-section>
         <div class="text-h6 text-weight-bold q-mb-md flex items-center">
@@ -56,7 +54,6 @@
           </div>
         </div>
 
-        <!-- Estatísticas rápidas -->
         <div v-if="externalPayments.length > 0" class="row q-mt-md">
           <div class="col-12">
             <q-chip color="positive" text-color="white" icon="check_circle">
@@ -69,7 +66,6 @@
         </div>
       </q-card-section>
 
-      <!-- Resultados da Pesquisa -->
       <q-card-section v-if="externalPayments.length > 0" class="q-pt-none">
         <q-separator class="q-mb-md" />
 
@@ -83,7 +79,6 @@
           :loading="externalPaymentsLoading"
           class="payments-table"
         >
-          <!-- Coluna Método -->
           <template v-slot:body-cell-method="props">
             <q-td :props="props">
               <q-chip
@@ -97,7 +92,6 @@
             </q-td>
           </template>
 
-          <!-- Coluna Valor -->
           <template v-slot:body-cell-amount="props">
             <q-td :props="props">
               <span class="text-weight-bold text-positive">
@@ -106,14 +100,12 @@
             </q-td>
           </template>
 
-          <!-- Coluna Data -->
           <template v-slot:body-cell-payment_date="props">
             <q-td :props="props">
               {{ formatDateTime(props.value) }}
             </q-td>
           </template>
 
-          <!-- Coluna Ações -->
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
               <q-btn
@@ -141,7 +133,6 @@
         </q-table>
       </q-card-section>
 
-      <!-- Estado Sem Resultados -->
       <q-card-section v-else-if="externalPaymentsSearched && !externalPaymentsLoading" class="q-pt-none">
         <q-separator class="q-mb-md" />
         <div class="text-center text-grey-7 q-py-xl">
@@ -152,7 +143,6 @@
       </q-card-section>
     </q-card>
 
-    <!-- Dialog de Associação -->
     <q-dialog v-model="associateDialog" persistent maximized>
       <q-card class="associate-dialog">
         <q-card-section class="row items-center q-pb-none">
@@ -163,7 +153,6 @@
 
         <q-card-section class="q-pt-md">
           <div class="row q-col-gutter-lg">
-            <!-- Coluna da Esquerda - Detalhes do Pagamento -->
             <div class="col-12 col-md-5">
               <q-card flat bordered class="payment-details-card">
                 <q-card-section>
@@ -209,7 +198,6 @@
               </q-card>
             </div>
 
-            <!-- Coluna da Direita - Formulário de Associação -->
             <div class="col-12 col-md-7">
               <q-card flat bordered>
                 <q-card-section>
@@ -297,7 +285,6 @@
       </q-card>
     </q-dialog>
 
-    <!-- Dialog de Detalhes do Pagamento -->
     <q-dialog v-model="detailsDialog">
       <q-card style="min-width: 350px">
         <q-card-section>
@@ -341,6 +328,7 @@
                 <q-item-label>{{ formatDateTime(selectedPayment.payment_date) }}</q-item-label>
               </q-item-section>
             </q-item>
+
           </q-list>
         </q-card-section>
 
@@ -364,30 +352,25 @@ export default {
   setup() {
     const $q = useQuasar()
 
-    // Estados
     const externalPaymentQuery = ref('')
     const externalPaymentsLoading = ref(false)
     const externalPayments = ref([])
     const externalPaymentsSearched = ref(false)
 
-    // Dialog states
     const associateDialog = ref(false)
     const detailsDialog = ref(false)
     const selectedPayment = ref(null)
 
-    // Association form
     const associationUser = ref(null)
     const associationCategory = ref('')
     const associationStartDate = ref(date.formatDate(Date.now(), 'YYYY-MM-DD'))
     const associationEndDate = ref('')
     const associationLoading = ref(false)
 
-    // User filter
     const filteringUsers = ref(false)
     const userOptions = ref([])
     const selectedUserData = ref(null)
 
-    // Plan options - valores exatos que o backend espera
     const planOptions = [
       { label: 'Ganha Fácil', value: 'ganha-facil' },
       { label: 'Profissional', value: 'profissional' },
@@ -397,7 +380,6 @@ export default {
       { label: 'Vídeos Prática Pesado', value: 'videos-practical-pesado' }
     ]
 
-    // Table columns
     const externalPaymentColumns = [
       { name: 'method', label: 'Método', field: 'method', align: 'left', sortable: true },
       { name: 'phone_number', label: 'Telefone', field: 'phone_number', align: 'left', sortable: true },
@@ -406,16 +388,14 @@ export default {
       { name: 'actions', label: 'Ações', field: 'actions', align: 'center' }
     ]
 
-    // Computed
     const totalExternalPayments = computed(() => {
       return externalPayments.value.reduce((sum, p) => sum + (p.amount || 0), 0)
     })
 
     const canAssociate = computed(() => {
-      return associationUser.value && associationCategory.value
+      return !!(associationUser.value && associationCategory.value)
     })
 
-    // Watch para calcular data de expiração
     watch([associationCategory, associationStartDate], ([newCategory, newStartDate]) => {
       if (newCategory && newStartDate) {
         const defaultValidityDays = newCategory === 'ganha-facil' ? 70 : 30
@@ -427,7 +407,6 @@ export default {
       }
     })
 
-    // Métodos
     const formatCurrency = (value) => {
       return new Intl.NumberFormat('pt-MZ', {
         style: 'currency',
@@ -457,10 +436,10 @@ export default {
           params: { phone: externalPaymentQuery.value }
         })
 
-        // Adiciona um ID único para cada pagamento
+        const ts = Date.now()
         externalPayments.value = (response.data.payments || []).map((p, index) => ({
           ...p,
-          id: `${p.method}-${index}-${Date.now()}`
+          id: `${p.method}-${index}-${ts}`
         }))
 
         if (externalPayments.value.length === 0) {
@@ -500,8 +479,7 @@ export default {
       selectedUserData.value = null
       associateDialog.value = true
 
-      // Pré-preenche a busca de usuários
-      filterUsers('', payment.phone_number)
+      filterUsers(payment.phone_number || '', (fn) => fn())
     }
 
     const viewPaymentDetails = (payment) => {
@@ -523,7 +501,7 @@ export default {
           userOptions.value = users.map(user => ({
             label: `${user.telefone} - ${user.first_name || user.username || 'Sem nome'}`,
             value: user.id,
-            user: user // Guarda o objeto completo do usuário
+            user: user
           }))
         })
       } catch (err) {
@@ -542,26 +520,21 @@ export default {
       associationLoading.value = true
 
       try {
-        // Encontrar o usuário selecionado
         const selectedOption = userOptions.value.find(u => u.value === associationUser.value)
 
         if (!selectedOption) {
           throw new Error('Usuário não encontrado')
         }
 
-        // Preparar payload exatamente como o backend espera
         const payload = {
-          user_id: associationUser.value, // ID do usuário
-          category: associationCategory.value, // Apenas o valor string, não o objeto
+          user_id: associationUser.value,
+          category: associationCategory.value,
           start_at: associationStartDate.value,
           end_at: associationEndDate.value,
-          phone_number: selectedPayment.value.phone_number, // Número do pagamento
-          amount: selectedPayment.value.amount // Valor do pagamento
+          phone_number: selectedPayment.value.phone_number,
+          amount: selectedPayment.value.amount
         }
 
-        console.log('Enviando payload:', payload) // Para debug
-
-        // Criar assinatura
         await api.post('/payments/admin/add/', payload)
 
         $q.notify({
@@ -571,15 +544,11 @@ export default {
 
         associateDialog.value = false
 
-        // Remove o pagamento associado da lista
         externalPayments.value = externalPayments.value.filter(
           p => p.id !== selectedPayment.value.id
         )
-
       } catch (err) {
         console.error('Erro ao associar pagamento:', err)
-        console.error('Resposta do erro:', err.response?.data) // Para debug
-
         $q.notify({
           type: 'negative',
           message: err.response?.data?.error || err.response?.data?.detail || 'Erro ao associar pagamento'
@@ -589,9 +558,7 @@ export default {
       }
     }
 
-    // Inicialização
     onMounted(() => {
-      // Verificar se há parâmetros na URL
       const query = new URLSearchParams(window.location.search)
       const phoneParam = query.get('phone')
       if (phoneParam) {
@@ -601,7 +568,6 @@ export default {
     })
 
     return {
-      // Estados
       externalPaymentQuery,
       externalPaymentsLoading,
       externalPayments,
@@ -610,8 +576,6 @@ export default {
       associateDialog,
       detailsDialog,
       selectedPayment,
-
-      // Formulário
       associationUser,
       associationCategory,
       associationStartDate,
@@ -620,12 +584,8 @@ export default {
       filteringUsers,
       userOptions,
       planOptions,
-
-      // Computed
       totalExternalPayments,
       canAssociate,
-
-      // Métodos
       searchExternalPayments,
       clearExternalPayments,
       openAssociateDialog,

@@ -232,7 +232,6 @@ export default {
       try {
         const response = await api.get('/me/')
         const data = response.data
-        // Normalizar para o layout (name, avatar) a partir do UserSerializer do backend
         user.value = {
           ...data,
           name: [data.first_name, data.last_name].filter(Boolean).join(' ').trim() || data.username || 'Usuário',
