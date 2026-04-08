@@ -17,10 +17,12 @@ const routes = [
       { path: 'users', component: Users },
       { path: 'workers', component: Workers },
       { path: 'payments', component: Payments },
+      { path: 'validacoes-pagamento', component: () => import('src/pages/PaymentValidationsPage.vue') },
       { path: 'ranking', component: ranking },
       { path: 'videoManager', component: videoManager },
       { path: 'relatorios', component: () => import('src/pages/UsersNoPaymentsPage.vue') },
       { path: 'pagamentos-falhados', component: () => import('src/pages/FailedPaymentsPage.vue') },
+      { path: 'reembolsos', component: () => import('src/pages/RefundsPage.vue') },
       { path: 'users-firebase', component: () => import('src/pages/FirebaseUsersPage.vue') }
     ],
     meta: { requiresAuth: true }

@@ -141,6 +141,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/validacoes-pagamento" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="verified_user" color="light-green-3" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Validações de pagamento</div>
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/relatorios" class="text-white">
             <q-item-section avatar>
               <q-icon name="person_off" color="orange-3" />
@@ -156,6 +165,15 @@
             </q-item-section>
             <q-item-section>
               <div class="text-weight-medium">Pagamentos falhados</div>
+            </q-item-section>
+          </q-item>
+
+          <q-item clickable v-ripple to="/reembolsos" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="currency_exchange" color="light-blue-3" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Reembolsos</div>
             </q-item-section>
           </q-item>
 

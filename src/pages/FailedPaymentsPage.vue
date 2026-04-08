@@ -4,8 +4,16 @@
       <q-card-section>
         <div class="text-h5 text-weight-bold q-mb-md">Pagamentos falhados</div>
         <p class="text-body2 text-grey-7 q-mb-md">
-          Tentativas de pagamento que falharam (base <strong>external_db</strong> – M-Pesa / E-Mola). Cada número aparece só uma vez (tentativa mais recente). Pode marcar que já deu assistência ao utilizador; fica guardado qual admin registou.
+          Tentativas de pagamento que <strong>falharam</strong> na base <strong>external_db</strong> (M-Pesa / E-Mola). Cada número aparece só uma vez (tentativa mais recente). Pode marcar assistência ao cliente.
         </p>
+        <q-banner rounded class="bg-teal-1 text-dark q-mb-md">
+          <template v-slot:avatar>
+            <q-icon name="payments" color="primary" />
+          </template>
+          <strong>O cliente diz que pagou com sucesso mas a app não desbloqueou?</strong>
+          Vá a <strong>Pagamentos</strong> e pesquise o número do comprovativo. Se o movimento existir no gateway, pode
+          <strong>vincular esse pagamento à conta</strong> do utilizador na Carta Fácil. Use o botão «Procurar pagamento» na linha.
+        </q-banner>
 
         <div class="row items-end q-gutter-md wrap">
           <q-input
@@ -112,6 +120,21 @@
               />
             </q-td>
           </template>
+          <template v-slot:body-cell-vincular="props">
+            <q-td :props="props">
+              <q-btn
+                dense
+                no-caps
+                outline
+                color="primary"
+                icon="link"
+                label="Procurar pagamento"
+                @click="goVincularPagamento(props.row)"
+              >
+                <q-tooltip>Pesquisar movimentos com sucesso e vincular à conta do cliente</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
           <template v-slot:no-data>
             <div class="full-width row flex-center text-grey-7 q-pa-lg">
               <q-icon name="info" size="2rem" class="q-mr-sm" />
@@ -127,6 +150,7 @@
 <script>
 import { ref, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
 import { api } from 'boot/axios'
 
 // const columns = [
@@ -146,6 +170,7 @@ const columns = [
   { name: 'created_at',     label: 'Data da tentativa',  field: 'created_at',     align: 'left', sortable: true },
   { name: 'failure_reason', label: 'Motivo da falha',    field: 'failure_reason', align: 'left' },
   { name: 'assistencia',    label: 'Assistência',        field: 'assisted_by_name', align: 'left' },
+  { name: 'vincular',       label: 'Pagamento OK?',      field: 'vincular', align: 'center' },
 ]
 
 export default {
@@ -153,6 +178,7 @@ export default {
 
   setup() {
     const $q = useQuasar()
+    const router = useRouter()
     const loading = ref(false)
     const rows = ref([])
     const dateFrom = ref('')
@@ -198,6 +224,15 @@ export default {
       loadFailed()
     }
 
+    function goVincularPagamento (row) {
+      const phone = (row.phone_number || row.account_phone || '').trim()
+      if (!phone) {
+        $q.notify({ type: 'warning', message: 'Sem número para pesquisar nesta linha.' })
+        return
+      }
+      router.push({ path: '/payments', query: { phone } })
+    }
+
     async function marcarAssistencia(row) {
       const phone = row.phone_number
       if (!phone) {
@@ -233,6 +268,7 @@ export default {
       loadFailed,
       clearDates,
       marcarAssistencia,
+      goVincularPagamento,
     }
   },
 }

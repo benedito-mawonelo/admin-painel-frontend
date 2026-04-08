@@ -1,16 +1,34 @@
 <template>
   <q-page class="payments-page q-pa-lg">
-    <div class="text-h4 text-weight-bold q-mb-md flex items-center">
-      <q-icon name="payments" size="md" class="q-mr-sm text-primary" />
-      Gestão de Pagamentos
+    <div class="text-h4 text-weight-bold q-mb-sm flex items-center">
+      <q-icon name="support_agent" size="md" class="q-mr-sm text-primary" />
+      Atendimento — pagamentos &amp; desbloqueio
+    </div>
+    <p class="text-body2 text-grey-8 q-mb-md" style="max-width: 920px">
+      Use esta página quando o utilizador <strong>diz que já pagou</strong> (M-Pesa / E-Mola) mas a <strong>app não desbloqueou</strong>.
+      Pesquise pelo <strong>número usado no pagamento</strong>; a coluna <em>Validação</em> mostra se esse movimento <strong>já foi associado</strong> a uma conta da app e por quem.
+      Se estiver <strong>livre para associar</strong>, escolha a <strong>conta do utilizador na Carta Fácil</strong> (pode ser outro número) e o plano correcto.
+    </p>
+    <div class="q-mb-lg">
+      <q-btn
+        outline
+        color="primary"
+        icon="verified_user"
+        label="Ver histórico de validações (quem vinculou a quem)"
+        :to="{ path: '/validacoes-pagamento' }"
+        no-caps
+      />
     </div>
 
     <q-card class="external-payments-card q-mb-lg">
       <q-card-section>
         <div class="text-h6 text-weight-bold q-mb-md flex items-center">
           <q-icon name="search" class="q-mr-sm" />
-          Pesquisar Pagamentos Externos
+          Pesquisar pagamentos bem-sucedidos no gateway
         </div>
+        <p class="text-caption text-grey-7 q-mb-md">
+          Indique o telefone que aparece no comprovativo M-Pesa / E-Mola (o mesmo formato que o cliente usa).
+        </p>
 
         <div class="row q-col-gutter-md">
           <div class="col-12 col-md-6">
@@ -106,6 +124,26 @@
             </q-td>
           </template>
 
+          <template v-slot:body-cell-validation="props">
+            <q-td :props="props">
+              <template v-if="props.row.claim">
+                <q-chip color="positive" text-color="white" size="sm" icon="check_circle">
+                  Já vinculado a um utilizador
+                </q-chip>
+                <div class="text-caption text-grey-8 q-mt-xs">
+                  <strong>Activado por:</strong> {{ props.row.claim.validated_by_name }}
+                  <span class="q-ml-sm"><strong>Dia:</strong> {{ formatDateTime(props.row.claim.validated_at) }}</span>
+                </div>
+                <div class="text-caption text-grey-8">
+                  <strong>Conta app:</strong> {{ props.row.claim.app_user_name }} (ID {{ props.row.claim.app_user_id }})
+                </div>
+              </template>
+              <q-chip v-else outline color="amber" text-color="dark" size="sm" icon="person_add">
+                Pode vincular a uma conta
+              </q-chip>
+            </q-td>
+          </template>
+
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
               <q-btn
@@ -114,9 +152,12 @@
                 color="primary"
                 icon="person_add"
                 size="sm"
+                :disable="!!props.row.claim"
                 @click="openAssociateDialog(props.row)"
               >
-                <q-tooltip>Associar a um utilizador</q-tooltip>
+                <q-tooltip>
+                  {{ props.row.claim ? 'Este pagamento já foi validado para outro utilizador' : 'Associar a um utilizador' }}
+                </q-tooltip>
               </q-btn>
               <q-btn
                 flat
@@ -203,13 +244,19 @@
                 <q-card-section>
                   <div class="text-subtitle1 text-weight-bold q-mb-md">
                     <q-icon name="assignment" class="q-mr-sm" />
-                    Configurar Assinatura
+                    Vincular à conta na app
                   </div>
+                  <q-banner dense rounded class="bg-blue-1 text-dark q-mb-md">
+                    <template v-slot:avatar>
+                      <q-icon name="info" color="primary" />
+                    </template>
+                    Escolha o <strong>utilizador da Carta Fácil</strong> que deve ficar com o plano activo — não confundir com o número que só serviu para pagar.
+                  </q-banner>
 
                   <q-select
                     v-model="associationUser"
                     outlined
-                    label="Selecionar Utilizador *"
+                    label="Conta do utilizador na app *"
                     :options="userOptions"
                     option-label="label"
                     option-value="value"
@@ -275,7 +322,7 @@
         <q-card-actions align="right" class="q-pa-lg">
           <q-btn flat label="Cancelar" color="negative" v-close-popup />
           <q-btn
-            label="Associar e Criar Assinatura"
+            label="Vincular pagamento e activar plano"
             color="positive"
             @click="confirmAssociation"
             :loading="associationLoading"
@@ -341,7 +388,8 @@
 </template>
 
 <script>
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from 'boot/axios'
 import { useQuasar } from 'quasar'
 import { date } from 'quasar'
@@ -351,6 +399,7 @@ export default {
 
   setup() {
     const $q = useQuasar()
+    const route = useRoute()
 
     const externalPaymentQuery = ref('')
     const externalPaymentsLoading = ref(false)
@@ -385,6 +434,7 @@ export default {
       { name: 'phone_number', label: 'Telefone', field: 'phone_number', align: 'left', sortable: true },
       { name: 'amount', label: 'Valor', field: 'amount', align: 'right', sortable: true },
       { name: 'payment_date', label: 'Data', field: 'payment_date', align: 'center', sortable: true },
+      { name: 'validation', label: 'Validação', field: 'validation', align: 'left', sortable: false },
       { name: 'actions', label: 'Ações', field: 'actions', align: 'center' }
     ]
 
@@ -432,7 +482,7 @@ export default {
       externalPaymentsSearched.value = true
 
       try {
-        const response = await api.get('/payments/external/', {
+        const response = await api.get('/payments/admin/external-with-claims/', {
           params: { phone: externalPaymentQuery.value }
         })
 
@@ -472,6 +522,14 @@ export default {
     }
 
     const openAssociateDialog = (payment) => {
+      if (payment.claim) {
+        $q.notify({
+          type: 'warning',
+          message: 'Este pagamento externo já foi validado e não pode ser associado a outro utilizador.',
+          caption: `Validado por ${payment.claim.validated_by_name} para ${payment.claim.app_user_name} (ID ${payment.claim.app_user_id}).`,
+        })
+        return
+      }
       selectedPayment.value = payment
       associationUser.value = null
       associationCategory.value = ''
@@ -526,13 +584,24 @@ export default {
           throw new Error('Usuário não encontrado')
         }
 
+        let paymentDate = selectedPayment.value.payment_date
+        if (paymentDate && typeof paymentDate === 'object' && typeof paymentDate.toISOString === 'function') {
+          paymentDate = paymentDate.toISOString()
+        }
+
         const payload = {
           user_id: associationUser.value,
           category: associationCategory.value,
           start_at: associationStartDate.value,
           end_at: associationEndDate.value,
           phone_number: selectedPayment.value.phone_number,
-          amount: selectedPayment.value.amount
+          amount: selectedPayment.value.amount,
+          external_source: {
+            phone_number: selectedPayment.value.phone_number,
+            payment_date: paymentDate,
+            amount: selectedPayment.value.amount,
+            method: selectedPayment.value.method
+          }
         }
 
         await api.post('/payments/admin/add/', payload)
@@ -543,10 +612,7 @@ export default {
         })
 
         associateDialog.value = false
-
-        externalPayments.value = externalPayments.value.filter(
-          p => p.id !== selectedPayment.value.id
-        )
+        await searchExternalPayments()
       } catch (err) {
         console.error('Erro ao associar pagamento:', err)
         $q.notify({
@@ -558,14 +624,16 @@ export default {
       }
     }
 
-    onMounted(() => {
-      const query = new URLSearchParams(window.location.search)
-      const phoneParam = query.get('phone')
-      if (phoneParam) {
-        externalPaymentQuery.value = phoneParam
-        searchExternalPayments()
-      }
-    })
+    watch(
+      () => route.query.phone,
+      (phoneParam) => {
+        if (phoneParam != null && String(phoneParam).trim() !== '') {
+          externalPaymentQuery.value = String(phoneParam).trim()
+          searchExternalPayments()
+        }
+      },
+      { immediate: true }
+    )
 
     return {
       externalPaymentQuery,

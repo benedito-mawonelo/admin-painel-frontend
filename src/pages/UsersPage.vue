@@ -172,6 +172,22 @@
                           <div class="col-8 col-md-4">{{ formatDate(subscription.startAt) }}</div>
                         </div>
 
+                        <div class="row items-center q-mb-sm">
+                          <div class="col-4 col-md-2 text-grey-7">Conta activada por:</div>
+                          <div class="col-8 col-md-4 text-weight-medium">
+                            {{
+                              subscription.activatedByStaffName
+                                ? subscription.activatedByStaffName
+                                : '— (app ou automático)'
+                            }}
+                          </div>
+
+                          <div class="col-4 col-md-2 text-grey-7">Dia da activação:</div>
+                          <div class="col-8 col-md-4">
+                            {{ formatDateTime(subscription.accountActivatedAt) }}
+                          </div>
+                        </div>
+
                         <div class="row items-center">
                           <div class="col-4 col-md-2 text-grey-7">Expira em:</div>
                           <div class="col-8 col-md-4">
@@ -964,6 +980,8 @@ export default {
         startAt: p.start_at || p.startAt,
         endAt: p.end_at || p.endAt,
         payedByNumber: p.phone_number || p.payedByNumber || data.telefone,
+        activatedByStaffName: p.activated_by_staff_name ?? p.activatedByStaffName ?? null,
+        accountActivatedAt: p.account_activated_at ?? p.accountActivatedAt ?? null,
       }))
       return {
         ...data,
@@ -1231,6 +1249,11 @@ export default {
       return date.formatDate(dateString, 'DD/MM/YYYY')
     }
 
+    const formatDateTime = (dateString) => {
+      if (!dateString) return '-'
+      return date.formatDate(dateString, 'DD/MM/YYYY HH:mm')
+    }
+
     const isDateFuture = (dateString) => {
       if (!dateString) return false
       return new Date(dateString) > new Date()
@@ -1364,6 +1387,7 @@ export default {
       triggerFileInput,
       handleFileUpload,
       formatDate,
+      formatDateTime,
       isDateFuture,
       getDaysRemaining,
       getDaysRemainingNumber,
