@@ -464,9 +464,37 @@ export default {
       }).format(value)
     }
 
+    /**
+     * Timestamps do gateway (M-Pesa / eMola) vêm muitas vezes em UTC sem sufixo Z.
+     * Sem isso, o JavaScript trata a string como hora local e em Moçambique (UTC+2) a hora fica ~2h errada.
+     */
+    const parseApiDateForDisplay = (input) => {
+      if (input == null || input === '') return null
+      if (input instanceof Date) {
+        return Number.isNaN(input.getTime()) ? null : input
+      }
+      let s = String(input).trim()
+      if (!s) return null
+      const hasExplicitZone =
+        /[zZ]$/.test(s) || /[+-]\d{2}:\d{2}(:\d{2})?$/.test(s)
+      if (hasExplicitZone) {
+        const d = new Date(s)
+        return Number.isNaN(d.getTime()) ? null : d
+      }
+      if (!s.includes('T') && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const d = new Date(s)
+        return Number.isNaN(d.getTime()) ? null : d
+      }
+      const normalized = s.replace(' ', 'T')
+      const withZ = normalized.endsWith('Z') ? normalized : `${normalized}Z`
+      const d = new Date(withZ)
+      return Number.isNaN(d.getTime()) ? null : d
+    }
+
     const formatDateTime = (dateString) => {
-      if (!dateString) return '-'
-      return date.formatDate(dateString, 'DD/MM/YYYY HH:mm')
+      const d = parseApiDateForDisplay(dateString)
+      if (!d) return dateString ? String(dateString) : '-'
+      return date.formatDate(d.getTime(), 'DD/MM/YYYY HH:mm')
     }
 
     const searchExternalPayments = async () => {
