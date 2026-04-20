@@ -4,12 +4,32 @@
       <q-icon name="currency_exchange" size="md" class="q-mr-sm text-primary" />
       Reembolsos
     </div>
-    <p class="text-body2 text-grey-8 q-mb-lg" style="max-width: 840px">
+    <p class="text-body2 text-grey-8 q-mb-md" style="max-width: 840px">
       Registo de <strong>reembolsos</strong> por utilizador: tipo (parcial, total, taxas, outro), valor opcional,
       <strong>número usado no pagamento</strong> (M-Pesa/e-Mola) quando for diferente do telefone de cadastro,
       <strong>canal</strong> (M-Pesa ou E-Mola, preenchido a partir do último pagamento quando existir),
       <strong>observações</strong> e <strong>data</strong>. Cada linha indica também quem registou no painel.
     </p>
+    <q-banner
+      v-if="isSuperUser"
+      dense
+      rounded
+      class="bg-purple-1 text-dark q-mb-lg"
+      style="max-width: 880px"
+    >
+      Como <strong>superadmin</strong>, altera o <strong>estado</strong> de cada reembolso (<em>Em revisão</em>, <em>Feito</em>, <em>Em espera</em>) na coluna da tabela.
+      A equipa do painel vê o mesmo estado em leitura, com <strong>data e quem</strong> definiu a última alteração, para evitar pedidos em duplicado.
+    </q-banner>
+    <q-banner
+      v-else-if="meLoaded"
+      dense
+      rounded
+      class="bg-blue-1 text-dark q-mb-lg"
+      style="max-width: 880px"
+    >
+      Vê o <strong>estado</strong> que o superadmin definiu para cada reembolso, e <strong>quando</strong> foi actualizado — só o superadmin pode mudar esse estado.
+      Use esta informação para não voltar a solicitar o mesmo reembolso ao superadmin.
+    </q-banner>
 
     <q-card flat bordered>
       <q-card-section class="row items-center q-pb-none">
@@ -91,6 +111,44 @@
                 label="E-Mola"
               />
               <span v-else class="text-grey-6">—</span>
+            </q-td>
+          </template>
+          <template v-slot:body-cell-workflow_status="props">
+            <q-td :props="props" class="workflow-cell">
+              <q-select
+                v-if="isSuperUser"
+                dense
+                outlined
+                emit-value
+                map-options
+                :options="workflowStatusOptions"
+                :model-value="props.row.workflow_status"
+                :loading="rowSavingId === props.row.id"
+                style="min-width: 168px"
+                @update:model-value="(v) => patchWorkflowStatus(props.row.id, v)"
+              />
+              <div v-else class="column q-gutter-xs">
+                <q-badge
+                  outline
+                  color="deep-purple"
+                  :label="props.row.workflow_status_label || '—'"
+                />
+                <div
+                  v-if="props.row.workflow_status_changed_at && props.row.workflow_status_changed_at_display !== '—'"
+                  class="text-caption text-grey-8"
+                >
+                  <template v-if="props.row.workflow_status_set_by_name">
+                    Superadmin {{ props.row.workflow_status_set_by_name }}
+                    · {{ props.row.workflow_status_changed_at_display }}
+                  </template>
+                  <template v-else>
+                    Última actualização: {{ props.row.workflow_status_changed_at_display }}
+                  </template>
+                </div>
+                <div v-else class="text-caption text-grey-6">
+                  Ainda sem alteração de estado registada pelo superadmin.
+                </div>
+              </div>
             </q-td>
           </template>
           <template v-slot:body-cell-amount="props">
@@ -218,6 +276,15 @@ const loading = ref(false)
 const loadError = ref('')
 const rows = ref([])
 const searchQuery = ref('')
+const isSuperUser = ref(false)
+const meLoaded = ref(false)
+const rowSavingId = ref(null)
+
+const workflowStatusOptions = [
+  { value: 'em_revisao', label: 'Em revisão' },
+  { value: 'feito', label: 'Feito' },
+  { value: 'em_espera', label: 'Em espera' },
+]
 
 const filteredRows = computed(() => {
   const list = rows.value
@@ -225,7 +292,7 @@ const filteredRows = computed(() => {
   if (!raw) return list
   const parts = raw.split(/\s+/).filter(Boolean)
   return list.filter((row) => {
-    const hay = [
+    const hayParts = [
       row.id,
       row.user_id,
       row.user_name,
@@ -240,6 +307,13 @@ const filteredRows = computed(() => {
       row.recorded_by_name,
       row.created_at,
     ]
+    hayParts.push(
+      row.workflow_status,
+      row.workflow_status_label,
+      row.workflow_status_set_by_name,
+      row.workflow_status_changed_at_display,
+    )
+    const hay = hayParts
       .map((x) => String(x ?? '').toLowerCase())
       .join(' ')
     return parts.every((p) => hay.includes(p))
@@ -273,7 +347,7 @@ const form = ref({
   observation: '',
 })
 
-const columns = [
+const baseColumns = [
   { name: 'id', label: 'ID', field: 'id', align: 'left', sortable: true },
   { name: 'created_at', label: 'Data / hora', field: 'created_at', align: 'left', sortable: true },
   { name: 'user_name', label: 'Conta activada (utilizador)', field: 'user_name', align: 'left', sortable: true },
@@ -286,6 +360,20 @@ const columns = [
   { name: 'recorded_by_name', label: 'Registado por', field: 'recorded_by_name', align: 'left', sortable: true },
 ]
 
+const columns = computed(() => {
+  const workflowCol = {
+    name: 'workflow_status',
+    label: 'Estado (superadmin)',
+    field: 'workflow_status_label',
+    align: 'left',
+    sortable: true,
+  }
+  const out = [...baseColumns]
+  const idx = out.findIndex((c) => c.name === 'recorded_by_name')
+  out.splice(idx >= 0 ? idx : out.length, 0, workflowCol)
+  return out
+})
+
 function formatMoney (v) {
   const n = parseFloat(v)
   if (Number.isNaN(n)) return v
@@ -293,10 +381,22 @@ function formatMoney (v) {
 }
 
 function formatRow (r) {
-  return {
+  const row = {
     ...r,
     created_at: r.created_at ? date.formatDate(r.created_at, 'DD/MM/YYYY HH:mm') : '-',
   }
+  if (r.workflow_status != null && r.workflow_status !== '') {
+    row.workflow_status = r.workflow_status
+    row.workflow_status_label =
+      r.workflow_status_label ||
+      workflowStatusOptions.find((o) => o.value === r.workflow_status)?.label ||
+      r.workflow_status
+  }
+  row.workflow_status_changed_at_display = r.workflow_status_changed_at
+    ? date.formatDate(r.workflow_status_changed_at, 'DD/MM/YYYY HH:mm')
+    : '—'
+  row.workflow_status_set_by_name = r.workflow_status_set_by_name || null
+  return row
 }
 
 /** Telefone e canal do primeiro pagamento com dados úteis (lista por -end_at no backend). */
@@ -339,6 +439,53 @@ watch(
     }
   }
 )
+
+async function loadMe () {
+  meLoaded.value = false
+  try {
+    const { data } = await api.get('/me/')
+    isSuperUser.value = !!data.is_superuser
+  } catch {
+    isSuperUser.value = false
+  } finally {
+    meLoaded.value = true
+  }
+}
+
+async function patchWorkflowStatus (refundId, newStatus) {
+  if (!refundId || !newStatus) return
+  rowSavingId.value = refundId
+  try {
+    const { data } = await api.patch(`/payments/admin/refunds/${refundId}/`, {
+      workflow_status: newStatus,
+    })
+    const row = rows.value.find((r) => r.id === refundId)
+    if (row && data) {
+      row.workflow_status = data.workflow_status
+      row.workflow_status_label =
+        data.workflow_status_label ||
+        workflowStatusOptions.find((o) => o.value === data.workflow_status)?.label ||
+        data.workflow_status
+      row.workflow_status_changed_at = data.workflow_status_changed_at
+      row.workflow_status_changed_at_display = data.workflow_status_changed_at
+        ? date.formatDate(data.workflow_status_changed_at, 'DD/MM/YYYY HH:mm')
+        : '—'
+      row.workflow_status_set_by_id = data.workflow_status_set_by_id
+      row.workflow_status_set_by_name = data.workflow_status_set_by_name || null
+    }
+    $q.notify({ type: 'positive', message: 'Estado do reembolso actualizado.' })
+  } catch (e) {
+    const msg =
+      e.response?.data?.error ||
+      e.response?.data?.detail ||
+      e.message ||
+      'Erro ao actualizar estado'
+    $q.notify({ type: 'negative', message: String(msg) })
+    await load()
+  } finally {
+    rowSavingId.value = null
+  }
+}
 
 async function load () {
   loading.value = true
@@ -447,8 +594,9 @@ async function submit () {
   }
 }
 
-onMounted(() => {
-  load()
+onMounted(async () => {
+  await loadMe()
+  await load()
 })
 </script>
 
@@ -457,5 +605,9 @@ onMounted(() => {
   max-width: 280px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+.workflow-cell {
+  min-width: 220px;
+  vertical-align: top;
 }
 </style>

@@ -6,10 +6,13 @@
       <q-btn
         color="primary"
         icon="add"
-        label="Novo Usuário"
-        @click="showUserForm(null)"
+        outline
+        label="Novo utilizador com painel"
         class="q-ml-md"
-      />
+        @click="hintCreateStaff"
+      >
+        <q-tooltip>Criação de contas com acesso ao painel continua no Django Admin</q-tooltip>
+      </q-btn>
     </div>
 
     <!-- Filtros e busca -->
@@ -67,8 +70,6 @@
         row-key="id"
         :loading="loading"
         v-model:pagination="pagination"
-        @request="onRequest"
-        binary-state-sort
         flat
       >
         <template v-slot:body-cell-avatar="props">
@@ -110,13 +111,14 @@
               <q-tooltip>Editar usuário</q-tooltip>
             </q-btn>
             <q-btn
+              v-if="isSuperUserMe"
               flat
               round
               :color="props.row.status === 'active' ? 'negative' : 'positive'"
               :icon="props.row.status === 'active' ? 'block' : 'check'"
               @click="toggleUserStatus(props.row)"
             >
-              <q-tooltip>{{ props.row.status === 'active' ? 'Desativar' : 'Ativar' }} usuário</q-tooltip>
+              <q-tooltip>{{ props.row.status === 'active' ? 'Desativar' : 'Ativar' }} conta</q-tooltip>
             </q-btn>
           </q-td>
         </template>
@@ -177,6 +179,10 @@
                       <div>{{ selectedUser.name }}</div>
                     </div>
                     <div class="col-12 col-md-6">
+                      <div class="text-caption text-grey">Login (username)</div>
+                      <div>{{ selectedUser.username || '—' }}</div>
+                    </div>
+                    <div class="col-12 col-md-6">
                       <div class="text-caption text-grey">CPF</div>
                       <div>{{ selectedUser.cpf || 'Não informado' }}</div>
                     </div>
@@ -197,7 +203,16 @@
 
                 <q-tab-panel name="permissions">
                   <div class="q-mb-md">
-                    <div class="text-subtitle2 q-mb-sm">Perfis do usuário</div>
+                    <div class="text-caption text-grey q-mb-xs">Nível de acesso Django (identificação no painel)</div>
+                    <q-badge
+                      :color="selectedUser.is_superuser ? 'purple' : 'primary'"
+                      :label="selectedUser.is_superuser ? 'Superuser (superadmin)' : 'Staff (acesso ao painel)'"
+                      class="q-mb-sm"
+                    />
+                    <div v-if="selectedUser.profile_role" class="text-body2 q-mb-md">
+                      Função na app: <strong>{{ selectedUser.profile_role }}</strong>
+                    </div>
+                    <div class="text-subtitle2 q-mb-sm">Etiquetas na lista</div>
                     <div class="row q-col-gutter-sm">
                       <div class="col-auto" v-for="role in selectedUser.roles" :key="role">
                         <q-chip color="primary" text-color="white">{{ role }}</q-chip>
@@ -241,7 +256,7 @@
     <q-dialog v-model="userFormDialog" persistent>
       <q-card style="min-width: 500px">
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">{{ formUser.id ? 'Editar Usuário' : 'Novo Usuário' }}</div>
+          <div class="text-h6">{{ formUser.id ? 'Editar funcionário' : 'Novo utilizador' }}</div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
@@ -295,19 +310,50 @@
                 <q-select
                   v-model="formUser.status"
                   :options="statusOptions"
-                  label="Status"
+                  option-value="value"
+                  option-label="label"
+                  emit-value
+                  map-options
+                  label="Conta activa"
                   outlined
+                  :disable="!isSuperUserMe"
+                  :hint="isSuperUserMe ? '' : 'Só o superadmin pode activar ou desactivar contas.'"
                 />
               </div>
-              <div class="col-12">
-                <q-select
-                  v-model="formUser.roles"
-                  :options="roleOptions"
-                  label="Perfis"
+              <div class="col-12 col-md-6">
+                <q-input
+                  v-model="formUser.username"
+                  label="Login (username)"
                   outlined
-                  multiple
-                  use-chips
-                  :rules="[val => val && val.length > 0 || 'Selecione pelo menos um perfil']"
+                  readonly
+                  hint="Não pode ser alterado aqui"
+                />
+              </div>
+              <div class="col-12 col-md-6">
+                <q-select
+                  v-model="formUser.profile_role_id"
+                  :options="appRolesOptions"
+                  option-value="value"
+                  option-label="label"
+                  emit-value
+                  map-options
+                  clearable
+                  outlined
+                  label="Função na app (perfil)"
+                  hint="Papel associado ao UserProfile no Django"
+                />
+              </div>
+              <div v-if="isSuperUserMe" class="col-12 col-md-6">
+                <q-select
+                  v-model="formUser.panel_access"
+                  :options="panelAccessOptions"
+                  option-value="value"
+                  option-label="label"
+                  emit-value
+                  map-options
+                  outlined
+                  label="Acesso ao painel (Django)"
+                  hint="Staff: painel sem superuser. Superadmin: superuser."
                 />
               </div>
               <div class="col-12">
@@ -350,8 +396,10 @@
 </template>
 
 <script>
+import { api } from 'boot/axios'
+
 export default {
-  name: 'UsersPage',
+  name: 'WorkersPage',
   data() {
     return {
       loading: false,
@@ -362,7 +410,27 @@ export default {
       userFormDialog: false,
       userDetailsTab: 'info',
       selectedUser: null,
-      formUser: this.getDefaultUser(),
+      formUser: {
+        id: null,
+        username: '',
+        name: '',
+        email: '',
+        phone: '',
+        cpf: '',
+        birth_date: '',
+        status: 'active',
+        profile_role_id: null,
+        panel_access: 'staff',
+        permissions: [],
+        address: '',
+        password: ''
+      },
+      isSuperUserMe: false,
+      appRolesOptions: [],
+      panelAccessOptions: [
+        { label: 'Staff (acesso ao painel)', value: 'staff' },
+        { label: 'Superadmin (superuser)', value: 'superadmin' },
+      ],
       isPwd: true,
       pagination: {
         sortBy: 'name',
@@ -383,6 +451,13 @@ export default {
           name: 'name',
           label: 'Nome',
           field: 'name',
+          align: 'left',
+          sortable: true
+        },
+        {
+          name: 'username',
+          label: 'Login (username)',
+          field: 'username',
           align: 'left',
           sortable: true
         },
@@ -409,8 +484,8 @@ export default {
         },
         {
           name: 'roles',
-          label: 'Perfis',
-          field: row => row.roles.join(', '),
+          label: 'Perfis / nível',
+          field: row => (row.roles || []).join(', '),
           align: 'left',
           sortable: true
         },
@@ -428,9 +503,7 @@ export default {
         { label: 'Ativo', value: 'active' },
         { label: 'Inativo', value: 'inactive' }
       ],
-      roleOptions: [
-        'Administrador', 'Gerente', 'Usuário', 'Suporte', 'Financeiro'
-      ],
+      roleOptions: ['Superadmin', 'Staff do painel'],
       userActivities: [
         {
           id: 1,
@@ -456,204 +529,255 @@ export default {
       ]
     }
   },
-  created() {
-    this.loadUsers();
+  async created() {
+    await Promise.all([this.loadMe(), this.loadAppRoles()])
+    await this.loadUsers()
   },
   methods: {
-    loadUsers() {
-      this.loading = true;
-      // Simulação de chamada API
-      setTimeout(() => {
-        this.users = [
-          {
-            id: 1,
-            name: 'Estevão Sitefane',
-            email: 'mawonelo@gmail.com',
-            phone: '+258 841313121',
-            cpf: '123.456.789-00',
-            birth_date: '1990-05-15',
-            status: 'active',
-            roles: ['Administrador', 'Gerente'],
-            permissions: ['users.create', 'users.delete'],
-            address: 'Rua das Flores, 123 - Maputo',
-            avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-            created_at: new Date('2023-01-15')
-          },
-          {
-            id: 1,
-            name: 'Benedito Muianga',
-            email: 'bennedito01@gmail.com',
-            phone: '+258 972720108',
-            cpf: '123.456.789-00',
-            birth_date: '1999-05-15',
-            status: 'active',
-            roles: ['Administrador', 'Gerente'],
-            permissions: ['users.create', 'users.delete'],
-            address: 'Magoanine c, 22 - Maputo',
-            avatar: 'https://randomuser.me/api/portraits/men/36.jpg',
-            created_at: new Date('2023-01-15')
-          },
-          {
-            id: 2,
-            name: 'Gracinda Manhiça',
-            email: 'gracinda@gmail.com',
-            phone: '+258 843746364',
-            cpf: '987.654.321-00',
-            birth_date: '1985-08-22',
-            status: 'active',
-            roles: ['Usuário'],
-            permissions: [],
-            address: 'Matola cimento, 456 - Matola',
-            avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-            created_at: new Date('2023-02-20')
-          },
-          {
-            id: 3,
-            name: 'Sara Maxalela',
-            email: 'Sara@example.com',
-            phone: '+258 843434227',
-            cpf: '456.789.123-00',
-            birth_date: '1978-11-30',
-            status: 'inactive',
-            roles: ['Financeiro'],
-            permissions: ['financial.reports'],
-            address: 'Rua das Pedras, 789 - Belo Horizonte/MG',
-            avatar: 'https://randomuser.me/api/portraits/women/45.jpg',
-            created_at: new Date('2023-03-10')
-          }
-        ];
-        this.filteredUsers = [...this.users];
-        this.pagination.rowsNumber = this.users.length;
-        this.loading = false;
-      }, 800);
+    async loadUsers() {
+      this.loading = true
+      try {
+        const { data } = await api.get('/users/staff/')
+        const list = Array.isArray(data) ? data : []
+        this.users = list.map((u) => this.mapStaffFromApi(u))
+        this.applyFilters()
+      } catch (e) {
+        const msg =
+          e.response?.data?.detail ||
+          (typeof e.response?.data === 'string' ? e.response.data : null) ||
+          e.message ||
+          'Erro ao carregar funcionários'
+        this.$q.notify({ type: 'negative', message: msg })
+        this.users = []
+        this.filteredUsers = []
+        this.pagination.rowsNumber = 0
+      } finally {
+        this.loading = false
+      }
     },
-      filterUsers() {
-      this.loading = true;
-      // Filtro por telefone
-      let filtered = this.users;
+    mapStaffFromApi(u) {
+      const roles = []
+      if (u.is_superuser) {
+        roles.push('Superadmin')
+      } else {
+        roles.push('Staff do painel')
+      }
+      if (u.profile_role) {
+        roles.push(`Função app: ${u.profile_role}`)
+      }
+      const name =
+        (u.display_name || '').trim() ||
+        [u.first_name, u.last_name].filter(Boolean).join(' ').trim() ||
+        u.username ||
+        `#${u.id}`
+      return {
+        id: u.id,
+        username: u.username || '',
+        name,
+        email: u.email || '',
+        phone: u.telefone || '',
+        status: u.is_active ? 'active' : 'inactive',
+        roles,
+        profile_role: u.profile_role || null,
+        profile_role_id: u.profile_role_id != null ? u.profile_role_id : null,
+        is_superuser: !!u.is_superuser,
+        cpf: '',
+        birth_date: '',
+        permissions: [],
+        address: '',
+        avatar: null,
+        created_at: u.date_joined,
+        last_login: u.last_login
+      }
+    },
+    filterUsers() {
+      this.loading = true
+      this.applyFilters()
+      this.loading = false
+    },
+    applyFilters() {
+      let filtered = [...this.users]
 
       if (this.searchPhone) {
-        const phoneToSearch = this.searchPhone.replace(/\D/g, '');
-        filtered = filtered.filter(user =>
-          user.phone.replace(/\D/g, '').includes(phoneToSearch)
-        ); // Aqui faltava o parêntese de fechamento
+        const phoneToSearch = this.searchPhone.replace(/\D/g, '')
+        if (phoneToSearch) {
+          filtered = filtered.filter((user) =>
+            (user.phone || '').replace(/\D/g, '').includes(phoneToSearch)
+          )
+        }
       }
 
-      // Filtro por status
       if (this.statusFilter) {
-        filtered = filtered.filter(user => user.status === this.statusFilter.value);
+        filtered = filtered.filter((user) => user.status === this.statusFilter.value)
       }
 
-      // Filtro por perfis
       if (this.roleFilter && this.roleFilter.length > 0) {
-        filtered = filtered.filter(user =>
-          this.roleFilter.some(role => user.roles.includes(role))
-        ); // Aqui faltava o parêntese de fechamento
+        filtered = filtered.filter((user) =>
+          this.roleFilter.some((role) => {
+            if (role === 'Superadmin') return !!user.is_superuser
+            if (role === 'Staff do painel') return !user.is_superuser
+            return (user.roles || []).includes(role)
+          })
+        )
       }
 
-      this.filteredUsers = filtered;
-      this.pagination.rowsNumber = filtered.length;
-      this.loading = false;
-    },
-
-    onRequest(props) {
-      const { page, rowsPerPage, sortBy, descending } = props.pagination;
-
-      // Ordenação
-      let sorted = [...this.filteredUsers];
-      if (sortBy) {
-        sorted.sort((a, b) => {
-          const x = descending ? b : a;
-          const y = descending ? a : b;
-
-          if (sortBy === 'roles') {
-            return x.roles.join(', ').localeCompare(y.roles.join(', '));
-          }
-
-          return x[sortBy] < y[sortBy] ? -1 : x[sortBy] > y[sortBy] ? 1 : 0;
-        });
-      }
-
-      // Paginação
-      const startRow = (page - 1) * rowsPerPage;
-      const paginated = sorted.slice(startRow, startRow + rowsPerPage);
-
-      this.pagination = {
-        ...props.pagination,
-        rowsNumber: this.filteredUsers.length
-      };
-
-      this.filteredUsers = paginated;
+      this.filteredUsers = filtered
+      this.pagination.rowsNumber = filtered.length
+      this.pagination.page = 1
     },
     viewUser(user) {
       this.selectedUser = { ...user };
       this.userDialog = true;
     },
-    showUserForm(user) {
-      this.formUser = user ? { ...user } : this.getDefaultUser();
-      this.userFormDialog = true;
+    hintCreateStaff() {
+      this.$q.notify({
+        type: 'info',
+        message:
+          'Para criar uma conta nova com acesso ao painel, use o Django Admin → Utilizadores → Adicionar (marque «Acesso à equipa» / staff e defina a palavra-passe). Depois pode ajustar nome, função na app e superadmin aqui.',
+        timeout: 8000,
+      })
+    },
+    async loadMe() {
+      try {
+        const { data } = await api.get('/me/')
+        this.isSuperUserMe = !!data.is_superuser
+      } catch {
+        this.isSuperUserMe = false
+      }
+    },
+    async loadAppRoles() {
+      try {
+        const { data } = await api.get('/users/roles/')
+        const list = Array.isArray(data) ? data : []
+        this.appRolesOptions = list.map((r) => ({ label: r.name, value: r.id }))
+      } catch {
+        this.appRolesOptions = []
+      }
+    },
+    async showUserForm(user) {
+      if (!user) {
+        this.hintCreateStaff()
+        return
+      }
+      this.loading = true
+      try {
+        const { data } = await api.get(`/users/${user.id}/`)
+        const name = [data.first_name, data.last_name].filter(Boolean).join(' ').trim() || data.username || ''
+        const prof = data.profile && data.profile.role
+        this.formUser = {
+          id: data.id,
+          username: data.username || '',
+          name,
+          email: data.email || '',
+          phone: data.telefone || '',
+          cpf: '',
+          birth_date: '',
+          status: data.is_active === false ? 'inactive' : 'active',
+          profile_role_id: prof && prof.id != null ? prof.id : null,
+          panel_access: data.is_superuser ? 'superadmin' : 'staff',
+          permissions: [],
+          address: '',
+          password: '',
+        }
+        this.userFormDialog = true
+      } catch (e) {
+        const msg =
+          e.response?.data?.detail ||
+          e.response?.data?.error ||
+          e.message ||
+          'Erro ao carregar utilizador'
+        this.$q.notify({ type: 'negative', message: String(msg) })
+      } finally {
+        this.loading = false
+      }
     },
     getDefaultUser() {
       return {
+        id: null,
+        username: '',
         name: '',
         email: '',
         phone: '',
         cpf: '',
         birth_date: '',
         status: 'active',
-        roles: [],
+        profile_role_id: null,
+        panel_access: 'staff',
         permissions: [],
         address: '',
-        password: ''
-      };
+        password: '',
+      }
     },
-    saveUser() {
-      this.loading = true;
-      // Simulação de chamada API
-      setTimeout(() => {
-        if (this.formUser.id) {
-          // Atualizar usuário existente
-          const index = this.users.findIndex(u => u.id === this.formUser.id);
-          if (index !== -1) {
-            this.users[index] = { ...this.formUser };
-          }
-        } else {
-          // Criar novo usuário
-          const newUser = {
-            ...this.formUser,
-            id: Math.max(...this.users.map(u => u.id)) + 1,
-            created_at: new Date(),
-            avatar: `https://randomuser.me/api/portraits/${Math.random() > 0.5 ? 'men' : 'women'}/${Math.floor(Math.random() * 100)}.jpg`
-          };
-          this.users.unshift(newUser);
+    async saveUser() {
+      if (!this.formUser.id) {
+        this.hintCreateStaff()
+        return
+      }
+      const name = (this.formUser.name || '').trim()
+      if (!name) {
+        this.$q.notify({ type: 'warning', message: 'Indique o nome.' })
+        return
+      }
+      this.loading = true
+      try {
+        const payload = {
+          name,
+          email: (this.formUser.email || '').trim(),
+          telefone: (this.formUser.phone || '').replace(/\D/g, '').slice(0, 20),
+          profile_role_id: this.formUser.profile_role_id,
         }
-
-        this.filterUsers();
-        this.userFormDialog = false;
-        this.loading = false;
-
+        const pwd = (this.formUser.password || '').trim()
+        if (pwd.length >= 6) {
+          payload.password = pwd
+        }
+        if (this.isSuperUserMe) {
+          payload.is_active = this.formUser.status === 'active'
+          payload.is_staff = true
+          payload.is_superuser = this.formUser.panel_access === 'superadmin'
+        }
+        await api.patch(`/users/${this.formUser.id}/`, payload)
+        this.$q.notify({ type: 'positive', message: 'Funcionário actualizado.' })
+        this.userFormDialog = false
+        await this.loadUsers()
+      } catch (e) {
+        const msg =
+          e.response?.data?.error ||
+          e.response?.data?.detail ||
+          e.message ||
+          'Erro ao guardar'
+        this.$q.notify({ type: 'negative', message: String(msg) })
+      } finally {
+        this.loading = false
+      }
+    },
+    async toggleUserStatus(user) {
+      if (!this.isSuperUserMe) {
+        this.$q.notify({
+          type: 'info',
+          message: 'Só o superadmin pode activar ou desactivar contas do painel.',
+        })
+        return
+      }
+      this.loading = true
+      try {
+        await api.patch(`/users/${user.id}/`, {
+          is_active: user.status !== 'active',
+        })
         this.$q.notify({
           type: 'positive',
-          message: `Usuário ${this.formUser.id ? 'atualizado' : 'criado'} com sucesso!`
-        });
-      }, 1000);
-    },
-    toggleUserStatus(user) {
-      this.loading = true;
-      // Simulação de chamada API
-      setTimeout(() => {
-        const index = this.users.findIndex(u => u.id === user.id);
-        if (index !== -1) {
-          this.users[index].status = user.status === 'active' ? 'inactive' : 'active';
-          this.filterUsers();
-
-          this.$q.notify({
-            type: 'positive',
-            message: `Usuário ${user.status === 'active' ? 'desativado' : 'ativado'} com sucesso!`
-          });
-        }
-        this.loading = false;
-      }, 800);
+          message: user.status === 'active' ? 'Conta desactivada.' : 'Conta activada.',
+        })
+        await this.loadUsers()
+      } catch (e) {
+        const msg =
+          e.response?.data?.error ||
+          e.response?.data?.detail ||
+          e.message ||
+          'Erro ao actualizar'
+        this.$q.notify({ type: 'negative', message: String(msg) })
+      } finally {
+        this.loading = false
+      }
     },
     formatDate(date) {
       if (!date) return '';
