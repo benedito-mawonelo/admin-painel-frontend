@@ -34,6 +34,12 @@ const routes = [
         component: () => import('src/pages/UsersNoPaymentsPage.vue'),
         meta: { icon: 'assessment', label: 'Relatórios' },
       },
+      {
+        path: '/angariadores-stats',
+        name: 'angariadores-stats',
+        component: () => import('src/pages/AngariadoresStatsPage.vue'),
+        meta: { icon: 'analytics', label: 'Stats Angariadores' },
+      },
 
      {
         path: '/video-manager',

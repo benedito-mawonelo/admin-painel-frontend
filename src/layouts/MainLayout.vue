@@ -159,6 +159,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/angariadores-stats" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="analytics" color="cyan-3" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Stats Angariadores</div>
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/pagamentos-falhados" class="text-white">
             <q-item-section avatar>
               <q-icon name="report_problem" color="red-4" />
