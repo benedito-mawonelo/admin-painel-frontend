@@ -23,7 +23,8 @@ const routes = [
       { path: 'relatorios', component: () => import('src/pages/UsersNoPaymentsPage.vue') },
       { path: 'pagamentos-falhados', component: () => import('src/pages/FailedPaymentsPage.vue') },
       { path: 'reembolsos', component: () => import('src/pages/RefundsPage.vue') },
-      { path: 'users-firebase', component: () => import('src/pages/FirebaseUsersPage.vue') }
+      { path: 'users-firebase', component: () => import('src/pages/FirebaseUsersPage.vue') },
+      { path: 'angariadores-stats', component: () => import('src/pages/AngariadoresStatsPage.vue') }
     ],
     meta: { requiresAuth: true }
   },
