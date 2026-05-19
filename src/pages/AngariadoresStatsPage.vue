@@ -97,15 +97,43 @@
         </div>
       </template>
       <div class="col-12 col-md-3">
-        <q-input
-          v-model="q"
+        <q-select
+          v-model="angariadorSeleccionado"
           outlined
           dense
           clearable
+          use-input
+          fill-input
+          hide-selected
+          input-debounce="300"
           label="Pesquisar angariador"
-          placeholder="Nome, username ou telefone"
+          placeholder="Nome, apelido ou telefone"
+          :options="angariadorOptions"
+          option-label="label"
+          :loading="angariadorSearchLoading"
+          @filter="filtrarAngariadores"
+          @update:model-value="onAngariadorSeleccionado"
+          @clear="onAngariadorLimpo"
           @keyup.enter="carregar"
-        />
+        >
+          <template v-slot:no-option>
+            <q-item>
+              <q-item-section class="text-grey">
+                Digite pelo menos 2 caracteres…
+              </q-item-section>
+            </q-item>
+          </template>
+          <template v-slot:option="scope">
+            <q-item v-bind="scope.itemProps">
+              <q-item-section>
+                <q-item-label>{{ scope.opt.label }}</q-item-label>
+                <q-item-label v-if="scope.opt.telefone" caption>
+                  {{ scope.opt.telefone }}
+                </q-item-label>
+              </q-item-section>
+            </q-item>
+          </template>
+        </q-select>
       </div>
       <div class="col-12 col-md-1">
         <q-btn
@@ -295,6 +323,9 @@ export default {
     const dataDiaPicker = ref(hojeIso)
     const dataSemanaPicker = ref(hojeIso)
     const q = ref('')
+    const angariadorSeleccionado = ref(null)
+    const angariadorOptions = ref([])
+    const angariadorSearchLoading = ref(false)
     const loading = ref(false)
     const resumo = ref({})
     const totaisPlataforma = ref({})
@@ -359,10 +390,52 @@ export default {
       return intervaloSemanaHint.value || '—'
     })
 
+    const filtrarAngariadores = (val, update) => {
+      const termo = (val || '').trim()
+      q.value = termo
+      angariadorSeleccionado.value = null
+      if (termo.length < 2) {
+        update(() => {
+          angariadorOptions.value = []
+        })
+        return
+      }
+      angariadorSearchLoading.value = true
+      api
+        .get('/angariadores/admin/search/', { params: { q: termo } })
+        .then((resp) => {
+          const lista = Array.isArray(resp.data) ? resp.data : []
+          update(() => {
+            angariadorOptions.value = lista
+          })
+        })
+        .catch(() => {
+          update(() => {
+            angariadorOptions.value = []
+          })
+        })
+        .finally(() => {
+          angariadorSearchLoading.value = false
+        })
+    }
+
+    const onAngariadorSeleccionado = (opt) => {
+      if (!opt) return
+      q.value = opt.label || ''
+      carregar()
+    }
+
+    const onAngariadorLimpo = () => {
+      angariadorSeleccionado.value = null
+      q.value = ''
+      angariadorOptions.value = []
+    }
+
     function buildQueryParams() {
       const base = {
         periodo: periodo.value,
-        q: q.value || undefined,
+        q: angariadorSeleccionado.value ? undefined : (q.value || undefined),
+        angariador_id: angariadorSeleccionado.value?.id || undefined,
       }
       if (periodo.value === 'mes') {
         return { ...base, mes: mes.value, ano: ano.value }
@@ -522,6 +595,12 @@ export default {
       intervaloSemanaHint,
       tituloResultados,
       q,
+      angariadorSeleccionado,
+      angariadorOptions,
+      angariadorSearchLoading,
+      filtrarAngariadores,
+      onAngariadorSeleccionado,
+      onAngariadorLimpo,
       loading,
       avisoTotaisPlataforma,
       resumo,

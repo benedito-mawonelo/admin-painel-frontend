@@ -6,7 +6,7 @@
     </div>
     <p class="text-body2 text-grey-8 q-mb-md" style="max-width: 920px">
       Use esta página quando o utilizador <strong>diz que já pagou</strong> (M-Pesa / E-Mola) mas a <strong>app não desbloqueou</strong>.
-      Pesquise pelo <strong>número usado no pagamento</strong>; a coluna <em>Validação</em> mostra se esse movimento <strong>já foi associado</strong> a uma conta da app e por quem.
+      Pesquise pelo <strong>número usado no pagamento</strong> ou pela <strong>conta da app</strong>; a tabela mostra <em>quem iniciou o pagamento na app</em>, o <em>telefone M-Pesa/E-Mola</em> e se o plano <strong>já foi vinculado</strong> a um utilizador.
       Se estiver <strong>livre para associar</strong>, escolha a <strong>conta do utilizador na Carta Fácil</strong> (pode ser outro número) e o plano correcto.
     </p>
     <div class="q-mb-lg">
@@ -27,7 +27,7 @@
           Pesquisar pagamentos bem-sucedidos no gateway
         </div>
         <p class="text-caption text-grey-7 q-mb-md">
-          Indique o telefone que aparece no comprovativo M-Pesa / E-Mola (o mesmo formato que o cliente usa).
+          Indique o telefone do comprovativo M-Pesa / E-Mola ou o número da conta na app que iniciou o pagamento.
         </p>
 
         <div class="row q-col-gutter-md">
@@ -70,6 +70,17 @@
               :disable="!externalPayments.length && !externalPaymentsSearched"
             />
           </div>
+        </div>
+
+        <div v-if="searchedPhoneAppAccount" class="q-mt-md">
+          <q-banner dense rounded class="bg-blue-1 text-dark">
+            <template v-slot:avatar>
+              <q-icon name="person" color="primary" />
+            </template>
+            O número pesquisado corresponde à conta na app:
+            <strong>{{ searchedPhoneAppAccount.label }}</strong>
+            (ID {{ searchedPhoneAppAccount.id }} · {{ searchedPhoneAppAccount.telefone || '—' }})
+          </q-banner>
         </div>
 
         <div v-if="externalPayments.length > 0" class="row q-mt-md">
@@ -124,22 +135,49 @@
             </q-td>
           </template>
 
+          <template v-slot:body-cell-account_name="props">
+            <q-td :props="props">
+              <span v-if="props.row.account_name" class="text-weight-medium">{{ props.row.account_name }}</span>
+              <span v-else class="text-grey-5">—</span>
+            </q-td>
+          </template>
+
+          <template v-slot:body-cell-account_phone="props">
+            <q-td :props="props">
+              <span v-if="props.row.account_phone">{{ props.row.account_phone }}</span>
+              <span v-else class="text-grey-5">—</span>
+              <div v-if="props.row.account_app_user" class="text-caption text-primary q-mt-xs">
+                Na app: {{ props.row.account_app_user.label }} (ID {{ props.row.account_app_user.id }})
+              </div>
+            </q-td>
+          </template>
+
+          <template v-slot:body-cell-payment_phone_app="props">
+            <q-td :props="props">
+              <template v-if="props.row.payment_phone_app_user">
+                <span class="text-weight-medium">{{ props.row.payment_phone_app_user.label }}</span>
+                <div class="text-caption text-grey-7">ID {{ props.row.payment_phone_app_user.id }}</div>
+              </template>
+              <span v-else class="text-grey-6 text-caption">Sem conta com este nº</span>
+            </q-td>
+          </template>
+
           <template v-slot:body-cell-validation="props">
             <q-td :props="props">
               <template v-if="props.row.claim">
                 <q-chip color="positive" text-color="white" size="sm" icon="check_circle">
-                  Já vinculado a um utilizador
+                  Plano vinculado
                 </q-chip>
                 <div class="text-caption text-grey-8 q-mt-xs">
-                  <strong>Activado por:</strong> {{ props.row.claim.validated_by_name }}
-                  <span class="q-ml-sm"><strong>Dia:</strong> {{ formatDateTime(props.row.claim.validated_at) }}</span>
+                  <strong>Beneficiário:</strong> {{ props.row.claim.app_user_name }} (ID {{ props.row.claim.app_user_id }})
                 </div>
                 <div class="text-caption text-grey-8">
-                  <strong>Conta app:</strong> {{ props.row.claim.app_user_name }} (ID {{ props.row.claim.app_user_id }})
+                  <strong>Validado por:</strong> {{ props.row.claim.validated_by_name }}
+                  · {{ formatDateTime(props.row.claim.validated_at) }}
                 </div>
               </template>
               <q-chip v-else outline color="amber" text-color="dark" size="sm" icon="person_add">
-                Pode vincular a uma conta
+                Pode vincular manualmente
               </q-chip>
             </q-td>
           </template>
@@ -217,8 +255,24 @@
                     </div>
 
                     <div class="row q-mb-sm">
-                      <div class="col-5 text-grey-7">Telefone:</div>
+                      <div class="col-5 text-grey-7">Conta que iniciou:</div>
+                      <div class="col-7">
+                        <span v-if="selectedPayment.account_name" class="text-weight-medium">{{ selectedPayment.account_name }}</span>
+                        <span v-else class="text-grey-6">—</span>
+                        <div v-if="selectedPayment.account_phone" class="text-caption">{{ selectedPayment.account_phone }}</div>
+                        <div v-if="selectedPayment.account_app_user" class="text-caption text-primary">
+                          Na app: {{ selectedPayment.account_app_user.label }} (ID {{ selectedPayment.account_app_user.id }})
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="row q-mb-sm">
+                      <div class="col-5 text-grey-7">Telefone pagamento:</div>
                       <div class="col-7 text-weight-bold">{{ selectedPayment.phone_number }}</div>
+                      <div v-if="selectedPayment.payment_phone_app_user" class="col-12 text-caption text-grey-8 q-mt-xs">
+                        Conta na app com este nº: {{ selectedPayment.payment_phone_app_user.label }}
+                        (ID {{ selectedPayment.payment_phone_app_user.id }})
+                      </div>
                     </div>
 
                     <div class="row q-mb-sm">
@@ -355,10 +409,27 @@
               </q-item-section>
             </q-item>
 
+            <q-item v-if="selectedPayment.account_name || selectedPayment.account_phone">
+              <q-item-section>
+                <q-item-label caption>Conta que iniciou na app</q-item-label>
+                <q-item-label>{{ selectedPayment.account_name || '—' }}</q-item-label>
+                <q-item-label caption v-if="selectedPayment.account_phone">{{ selectedPayment.account_phone }}</q-item-label>
+                <q-item-label v-if="selectedPayment.account_app_user" class="text-primary">
+                  {{ selectedPayment.account_app_user.label }} (ID {{ selectedPayment.account_app_user.id }})
+                </q-item-label>
+              </q-item-section>
+            </q-item>
+
             <q-item>
               <q-item-section>
-                <q-item-label caption>Número</q-item-label>
+                <q-item-label caption>Telefone do pagamento</q-item-label>
                 <q-item-label>{{ selectedPayment.phone_number }}</q-item-label>
+                <q-item-label v-if="selectedPayment.payment_phone_app_user" caption class="text-primary">
+                  Conta na app: {{ selectedPayment.payment_phone_app_user.label }}
+                </q-item-label>
+                <q-item-label v-else-if="!selectedPayment.payment_phone_app_user" caption class="text-grey-6">
+                  Sem conta registada com este número
+                </q-item-label>
               </q-item-section>
             </q-item>
 
@@ -430,13 +501,18 @@ export default {
     ]
 
     const externalPaymentColumns = [
+      { name: 'account_name', label: 'Conta que pagou', field: 'account_name', align: 'left', sortable: true },
+      { name: 'account_phone', label: 'Nº da conta', field: 'account_phone', align: 'left' },
+      { name: 'phone_number', label: 'Telefone pagamento', field: 'phone_number', align: 'left', sortable: true },
+      { name: 'payment_phone_app', label: 'Conta do nº pagamento', field: 'payment_phone_app', align: 'left' },
       { name: 'method', label: 'Método', field: 'method', align: 'left', sortable: true },
-      { name: 'phone_number', label: 'Telefone', field: 'phone_number', align: 'left', sortable: true },
       { name: 'amount', label: 'Valor', field: 'amount', align: 'right', sortable: true },
       { name: 'payment_date', label: 'Data', field: 'payment_date', align: 'center', sortable: true },
-      { name: 'validation', label: 'Validação', field: 'validation', align: 'left', sortable: false },
+      { name: 'validation', label: 'Vinculação do plano', field: 'validation', align: 'left', sortable: false },
       { name: 'actions', label: 'Ações', field: 'actions', align: 'center' }
     ]
+
+    const searchedPhoneAppAccount = ref(null)
 
     const totalExternalPayments = computed(() => {
       return externalPayments.value.reduce((sum, p) => sum + (p.amount || 0), 0)
@@ -515,6 +591,7 @@ export default {
         })
 
         const ts = Date.now()
+        searchedPhoneAppAccount.value = response.data.searched_phone_app_account || null
         externalPayments.value = (response.data.payments || []).map((p, index) => ({
           ...p,
           id: `${p.method}-${index}-${ts}`
@@ -547,6 +624,7 @@ export default {
       externalPayments.value = []
       externalPaymentsSearched.value = false
       externalPaymentQuery.value = ''
+      searchedPhoneAppAccount.value = null
     }
 
     const openAssociateDialog = (payment) => {
@@ -665,6 +743,7 @@ export default {
 
     return {
       externalPaymentQuery,
+      searchedPhoneAppAccount,
       externalPaymentsLoading,
       externalPayments,
       externalPaymentsSearched,
