@@ -346,11 +346,17 @@
         <div class="text-caption text-grey-7 q-mb-md">
           Top {{ mixPacotes.angariadores.length }} angariadores no período · barras agrupadas por pacote
         </div>
-        <div v-if="chartTemDados" class="stats-chart-wrap stats-chart-wrap--mix">
-          <Bar :data="chartData" :options="chartOptions" />
+        <div v-if="chartMostrar" class="stats-chart-wrap stats-chart-wrap--mix">
+          <Bar :key="chartInstanceKey" :data="chartData" :options="chartOptions" />
+          <div
+            v-if="!chartTemDados"
+            class="text-caption text-grey-6 text-center q-mt-sm"
+          >
+            Sem conversões com pacote identificado; barras a zero para comparação entre angariadores.
+          </div>
         </div>
         <div v-else class="text-center text-grey-6 q-py-lg">
-          Sem conversões com pacote identificado neste período.
+          Sem angariadores no período para o gráfico.
         </div>
       </q-card-section>
     </q-card>
@@ -503,6 +509,62 @@ function deduplicarResultados(rows) {
   return Array.from(byKey.values())
 }
 
+function ordenarResultados(rows) {
+  return [...rows].sort((a, b) => {
+    if (b.total_pontos !== a.total_pontos) return b.total_pontos - a.total_pontos
+    return b.total_convertidos - a.total_convertidos
+  })
+}
+
+/** Garante até 4 angariadores no gráfico (top do período), com mix da API por ID. */
+function enriquecerMixPacotes(mix, resultadosSorted) {
+  const pacotes = mix?.pacotes?.length ? mix.pacotes : PACOTES_LABELS_FALLBACK
+  const zeros = () => pacotes.map(() => 0)
+  const byId = new Map()
+  for (const a of mix?.angariadores || []) {
+    const id = a?.angariador_id
+    if (id == null || id === '') continue
+    const key = String(id)
+    if (!byId.has(key)) {
+      byId.set(key, {
+        angariador_id: id,
+        nome: a.nome,
+        username: a.username || '',
+        valores: [...(a.valores || zeros())],
+      })
+    }
+  }
+  const out = []
+  for (const row of resultadosSorted) {
+    if (out.length >= MAX_ANGARIADORES_GRAFICO) break
+    const id = row.angariador_id ?? row.id
+    if (id == null || id === '') continue
+    const key = String(id)
+    if (out.some((x) => String(x.angariador_id) === key)) continue
+    if (byId.has(key)) {
+      out.push(byId.get(key))
+    } else {
+      out.push({
+        angariador_id: id,
+        nome: row.nome,
+        username: row.username || '',
+        valores: zeros(),
+      })
+    }
+  }
+  return { pacotes, angariadores: out }
+}
+
+function labelAngariadorGrafico(ang) {
+  const nome = String(ang.nome || '').trim() || 'Angariador'
+  const user = String(ang.username || '').trim()
+  if (user && user.toLowerCase() !== nome.toLowerCase()) {
+    return user.length > 12 ? `${nome} (${user.slice(0, 10)}…)` : `${nome} (${user})`
+  }
+  if (ang.angariador_id != null) return `${nome} #${ang.angariador_id}`
+  return nome
+}
+
 export default {
   name: 'AngariadoresStatsPage',
   components: { Bar },
@@ -607,6 +669,16 @@ export default {
       return 'mês'
     })
 
+    const chartInstanceKey = computed(() => {
+      return (mixPacotes.value.angariadores || [])
+        .map((a) => `${a.angariador_id}:${labelAngariadorGrafico(a)}`)
+        .join('|')
+    })
+
+    const chartMostrar = computed(() => {
+      return (mixPacotes.value.angariadores || []).length > 0
+    })
+
     const chartTemDados = computed(() => {
       const angs = mixPacotes.value.angariadores || []
       return angs.some((a) => (a.valores || []).some((v) => v > 0))
@@ -616,12 +688,17 @@ export default {
       const mix = mixPacotes.value
       const labels = mix.pacotes?.length ? mix.pacotes : PACOTES_LABELS_FALLBACK
       const angs = mix.angariadores || []
+      const usedLabels = new Set()
       return {
         labels,
         datasets: angs.map((ang, i) => {
-          const nome = ang.nome || `Angariador ${i + 1}`
+          let legenda = labelAngariadorGrafico(ang)
+          if (usedLabels.has(legenda)) {
+            legenda = `${legenda} ·${i + 1}`
+          }
+          usedLabels.add(legenda)
           return {
-            label: nome.length > 18 ? `${nome.slice(0, 16)}…` : nome,
+            label: legenda.length > 22 ? `${legenda.slice(0, 20)}…` : legenda,
             data: labels.map((_, idx) => (ang.valores || [])[idx] ?? 0),
             backgroundColor: CHART_CORES_ANGARIADOR[i % CHART_CORES_ANGARIADOR.length],
             borderRadius: 6,
@@ -957,12 +1034,13 @@ export default {
         resumo.value = body.resumo || {}
         const tp = body.totais_plataforma || body.totaisPlataforma || {}
         totaisPlataforma.value = typeof tp === 'object' && tp !== null ? { ...tp } : {}
-        resultados.value = deduplicarResultados(body.resultados || [])
-        const mix = body.mix_pacotes || body.mixPacotes || {}
-        mixPacotes.value = {
-          pacotes: mix.pacotes || PACOTES_LABELS_FALLBACK,
-          angariadores: (mix.angariadores || []).slice(0, MAX_ANGARIADORES_GRAFICO),
-        }
+        const deduped = deduplicarResultados(body.resultados || [])
+        const sorted = ordenarResultados(deduped)
+        resultados.value = sorted
+        mixPacotes.value = enriquecerMixPacotes(
+          body.mix_pacotes || body.mixPacotes,
+          sorted
+        )
         mesNome.value = body.mes_nome || ''
         resultadoStatsOk.value = true
       } catch (err) {
@@ -1082,9 +1160,12 @@ export default {
       maxAngariados,
       mixPacotes,
       tituloPeriodoGrafico,
+      chartInstanceKey,
+      chartMostrar,
       chartTemDados,
       chartData,
       chartOptions,
+      labelAngariadorGrafico,
       kpisTopo,
       metasPeriodo,
       rotuloMetaPeriodo,
