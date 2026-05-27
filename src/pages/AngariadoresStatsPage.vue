@@ -313,7 +313,7 @@
     <q-separator class="q-my-xl" />
 
     <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm section-label">
-      Mais detalhes e exportação
+      Metas e panorama
     </div>
 
     <!-- Snapshot plataforma -->
@@ -361,53 +361,119 @@
       </q-card-section>
     </q-card>
 
-    <!-- Tabela detalhada -->
-    <q-card flat bordered class="stats-panel-card">
-      <q-card-section class="q-pb-none">
+    <!-- Metas diárias por pacote -->
+    <q-card v-if="metasAngariadores.length" flat bordered class="stats-panel-card q-mb-lg">
+      <q-card-section class="q-pb-sm">
+        <div class="stats-section-title q-mb-xs">METAS DIÁRIAS</div>
         <div class="text-subtitle1 text-weight-bold text-grey-9">
-          Detalhe completo
-        </div>
-        <div class="text-caption text-grey-7">
-          Ordenado por pontos e convertidos · exportável em CSV
+          Progresso de {{ metasPacotes.referencia_dia_rotulo || 'hoje' }}
         </div>
       </q-card-section>
-      <q-separator />
-      <q-card-section class="q-pa-none">
-        <q-table
-          :rows="resultados"
-          :columns="columns"
-          row-key="angariador_id"
-          flat
-          :pagination="{ rowsPerPage: 10, sortBy: 'total_pontos', descending: true }"
-          class="stats-table"
-        >
-          <template v-slot:body-cell-nome="props">
-            <q-td :props="props">
-              <div class="row items-center no-wrap">
-                <q-avatar size="32px" :color="avatarCor(props.rowIndex)" text-color="white" class="q-mr-sm">
-                  <span class="text-caption text-weight-bold">{{ iniciais(props.row.nome) }}</span>
-                </q-avatar>
-                <div>
-                  <div class="text-weight-medium">{{ props.row.nome }}</div>
-                  <div class="text-caption text-grey-6">{{ props.row.telefone || '—' }}</div>
-                </div>
-              </div>
-            </q-td>
-          </template>
-          <template v-slot:body-cell-total_pontos="props">
-            <q-td :props="props">
-              <span class="text-weight-bold text-primary">{{ props.value }}</span>
-            </q-td>
-          </template>
-          <template v-slot:body-cell-taxa_conversao="props">
-            <q-td :props="props">
-              <q-chip dense :color="corTaxa(props.value)" text-color="white">
-                {{ props.value }}%
-              </q-chip>
-            </q-td>
-          </template>
-        </q-table>
+      <q-card-section class="q-pt-none">
+        <q-markup-table flat bordered separator="horizontal" class="metas-pacote-table">
+          <thead>
+            <tr>
+              <th class="text-left text-weight-bold">Pacote</th>
+              <th class="text-center text-weight-bold">Meta diária</th>
+              <th
+                v-for="ang in metasAngariadores"
+                :key="`d-head-${chaveAngariador(ang)}`"
+                class="text-center text-weight-bold"
+              >
+                {{ labelAngariadorGrafico(ang) }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(pacote, pIdx) in metasPacotes.pacotes"
+              :key="`d-row-${pacote}`"
+            >
+              <td class="text-grey-9">{{ pacote }}</td>
+              <td class="text-center text-weight-medium">
+                {{ metasPacotes.metas_diarias[pIdx] }}
+              </td>
+              <td
+                v-for="ang in metasAngariadores"
+                :key="`d-cell-${pacote}-${chaveAngariador(ang)}`"
+                class="text-center"
+              >
+                <span
+                  class="meta-chip"
+                  :class="classeChipMeta(ang.progresso_dia[pIdx], metasPacotes.metas_diarias[pIdx])"
+                >
+                  {{ ang.progresso_dia[pIdx] ?? 0 }}/{{ metasPacotes.metas_diarias[pIdx] }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </q-markup-table>
       </q-card-section>
+
+      <q-card-section class="text-center q-py-sm">
+        <q-btn
+          round
+          unelevated
+          color="grey-3"
+          text-color="grey-8"
+          :icon="metasMensaisVisivel ? 'expand_less' : 'expand_more'"
+          :aria-label="metasMensaisVisivel ? 'Ocultar metas mensais' : 'Ver metas do mês'"
+          @click="metasMensaisVisivel = !metasMensaisVisivel"
+        />
+        <div class="text-caption text-grey-6 q-mt-xs">
+          {{ metasMensaisVisivel ? 'Ocultar metas mensais' : 'Ver metas de todo o mês' }}
+        </div>
+      </q-card-section>
+
+      <q-slide-transition>
+        <div v-show="metasMensaisVisivel">
+          <q-separator />
+          <q-card-section>
+            <div class="stats-section-title q-mb-xs">METAS MENSAIS</div>
+            <div class="text-subtitle1 text-weight-bold text-grey-9 q-mb-md">
+              Progresso de {{ metasPacotes.referencia_mes || tituloResultados }}
+            </div>
+            <q-markup-table flat bordered separator="horizontal" class="metas-pacote-table">
+              <thead>
+                <tr>
+                  <th class="text-left text-weight-bold">Pacote</th>
+                  <th class="text-center text-weight-bold">Meta mensal</th>
+                  <th
+                    v-for="ang in metasAngariadores"
+                    :key="`m-head-${chaveAngariador(ang)}`"
+                    class="text-center text-weight-bold"
+                  >
+                    {{ labelAngariadorGrafico(ang) }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(pacote, pIdx) in metasPacotes.pacotes"
+                  :key="`m-row-${pacote}`"
+                >
+                  <td class="text-grey-9">{{ pacote }}</td>
+                  <td class="text-center text-weight-medium">
+                    {{ metasPacotes.metas_mensais[pIdx] }}
+                  </td>
+                  <td
+                    v-for="ang in metasAngariadores"
+                    :key="`m-cell-${pacote}-${chaveAngariador(ang)}`"
+                    class="text-center"
+                  >
+                    <span
+                      class="meta-chip"
+                      :class="classeChipMeta(ang.progresso_mes[pIdx], metasPacotes.metas_mensais[pIdx])"
+                    >
+                      {{ ang.progresso_mes[pIdx] ?? 0 }}/{{ metasPacotes.metas_mensais[pIdx] }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </q-markup-table>
+          </q-card-section>
+        </div>
+      </q-slide-transition>
     </q-card>
   </q-page>
 </template>
@@ -479,6 +545,9 @@ const PACOTES_LABELS_FALLBACK = [
   'Práticas L.',
   'Práticas P.',
 ]
+
+const METAS_DIARIAS_FALLBACK = [6, 3, 2, 3, 3, 3]
+const METAS_MENSAIS_FALLBACK = METAS_DIARIAS_FALLBACK.map((m) => m * 22)
 
 function chaveAngariador(row) {
   const id = row?.angariador_id ?? row?.id
@@ -555,6 +624,60 @@ function enriquecerMixPacotes(mix, resultadosSorted) {
   return { pacotes, angariadores: out }
 }
 
+function enriquecerMetasPacotes(metas, resultadosSorted) {
+  const pacotes = metas?.pacotes?.length ? metas.pacotes : PACOTES_LABELS_FALLBACK
+  const metasDiarias = metas?.metas_diarias?.length
+    ? metas.metas_diarias
+    : METAS_DIARIAS_FALLBACK
+  const metasMensais = metas?.metas_mensais?.length
+    ? metas.metas_mensais
+    : METAS_MENSAIS_FALLBACK
+  const zeros = () => pacotes.map(() => 0)
+  const byId = new Map()
+  for (const a of metas?.angariadores || []) {
+    const id = a?.angariador_id
+    if (id == null || id === '') continue
+    const key = String(id)
+    if (!byId.has(key)) {
+      byId.set(key, {
+        angariador_id: id,
+        nome: a.nome,
+        username: a.username || '',
+        progresso_dia: [...(a.progresso_dia || zeros())],
+        progresso_mes: [...(a.progresso_mes || zeros())],
+      })
+    }
+  }
+  const angariadores = []
+  for (const row of resultadosSorted) {
+    if (angariadores.length >= MAX_ANGARIADORES_GRAFICO) break
+    const id = row.angariador_id ?? row.id
+    if (id == null || id === '') continue
+    const key = String(id)
+    if (angariadores.some((x) => String(x.angariador_id) === key)) continue
+    if (byId.has(key)) {
+      angariadores.push(byId.get(key))
+    } else {
+      angariadores.push({
+        angariador_id: id,
+        nome: row.nome,
+        username: row.username || '',
+        progresso_dia: zeros(),
+        progresso_mes: zeros(),
+      })
+    }
+  }
+  return {
+    pacotes,
+    metas_diarias: metasDiarias,
+    metas_mensais: metasMensais,
+    referencia_dia: metas?.referencia_dia || '',
+    referencia_dia_rotulo: metas?.referencia_dia_rotulo || '',
+    referencia_mes: metas?.referencia_mes || '',
+    angariadores,
+  }
+}
+
 function labelAngariadorGrafico(ang) {
   const nome = String(ang.nome || '').trim() || 'Angariador'
   const user = String(ang.username || '').trim()
@@ -587,6 +710,15 @@ export default {
     const resultadoStatsOk = ref(false)
     const resultados = ref([])
     const mixPacotes = ref({ pacotes: [], angariadores: [] })
+    const metasPacotes = ref({
+      pacotes: [],
+      metas_diarias: [],
+      metas_mensais: [],
+      referencia_dia_rotulo: '',
+      referencia_mes: '',
+      angariadores: [],
+    })
+    const metasMensaisVisivel = ref(false)
     const mesNome = ref('')
 
     const avisoTotaisPlataforma = computed(() => {
@@ -657,6 +789,18 @@ export default {
     const resultadosPerformance = computed(() => {
       return resultadosOrdenados.value.slice(0, MAX_CARTOES_PERFORMANCE)
     })
+
+    const metasAngariadores = computed(() => metasPacotes.value.angariadores || [])
+
+    function classeChipMeta(actual, meta) {
+      const a = Number(actual) || 0
+      const m = Number(meta) || 0
+      if (m <= 0) return 'meta-chip--muted'
+      const ratio = a / m
+      if (ratio >= 1) return 'meta-chip--ok'
+      if (ratio >= 0.5) return 'meta-chip--warn'
+      return 'meta-chip--bad'
+    }
 
     const maxAngariados = computed(() => {
       const vals = resultados.value.map((r) => r.total_angariados || 0)
@@ -1012,17 +1156,6 @@ export default {
       return 'angariadores-stats.csv'
     }
 
-    const columns = [
-      { name: 'nome', label: 'Angariador', field: 'nome', align: 'left', sortable: true },
-      { name: 'username', label: 'Username', field: 'username', align: 'left', sortable: true },
-      { name: 'total_angariados', label: 'Angariados', field: 'total_angariados', align: 'right', sortable: true },
-      { name: 'total_convertidos', label: 'Convertidos', field: 'total_convertidos', align: 'right', sortable: true },
-      { name: 'pending_activos', label: 'Pending', field: 'pending_activos', align: 'right', sortable: true },
-      { name: 'pending_expirados', label: 'Expirados', field: 'pending_expirados', align: 'right', sortable: true },
-      { name: 'total_pontos', label: 'Pontos', field: 'total_pontos', align: 'right', sortable: true },
-      { name: 'taxa_conversao', label: 'Taxa', field: 'taxa_conversao', align: 'center', sortable: true },
-    ]
-
     const carregar = async () => {
       loading.value = true
       resultadoStatsOk.value = false
@@ -1039,6 +1172,10 @@ export default {
         resultados.value = sorted
         mixPacotes.value = enriquecerMixPacotes(
           body.mix_pacotes || body.mixPacotes,
+          sorted
+        )
+        metasPacotes.value = enriquecerMetasPacotes(
+          body.metas_pacotes || body.metasPacotes,
           sorted
         )
         mesNome.value = body.mes_nome || ''
@@ -1159,6 +1296,10 @@ export default {
       textoBannerAngariador,
       maxAngariados,
       mixPacotes,
+      metasPacotes,
+      metasAngariadores,
+      metasMensaisVisivel,
+      classeChipMeta,
       tituloPeriodoGrafico,
       chartInstanceKey,
       chartMostrar,
@@ -1181,7 +1322,6 @@ export default {
       classeCartaoAngariador,
       etiquetaDesempenho,
       mesNome,
-      columns,
       carregar,
       exportarCsv,
     }
@@ -1363,5 +1503,54 @@ export default {
 
 .stats-table :deep(tbody tr:hover) {
   background: #f1f8e9;
+}
+
+.metas-pacote-table {
+  border-radius: 8px;
+  overflow: hidden;
+
+  thead tr {
+    background: #fafafa;
+  }
+
+  th,
+  td {
+    padding: 10px 12px;
+    font-size: 0.875rem;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #fcfcfc;
+  }
+}
+
+.meta-chip {
+  display: inline-block;
+  min-width: 52px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+
+  &--ok {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  &--warn {
+    background: #fff8e1;
+    color: #f57c00;
+  }
+
+  &--bad {
+    background: #ffebee;
+    color: #c62828;
+  }
+
+  &--muted {
+    background: #f5f5f5;
+    color: #757575;
+  }
 }
 </style>
