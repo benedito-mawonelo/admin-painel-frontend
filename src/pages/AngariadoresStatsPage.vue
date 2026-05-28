@@ -196,6 +196,54 @@
       </div>
     </div>
 
+    <q-card flat bordered class="stats-panel-card q-mb-lg">
+      <q-card-section class="q-py-sm">
+        <div class="row items-center q-col-gutter-sm">
+          <div class="col-auto text-caption text-grey-7 text-weight-medium">
+            Chamadas registadas:
+          </div>
+          <div class="col-auto">
+            <q-btn-toggle
+              v-model="modoChamadas"
+              no-caps
+              dense
+              unelevated
+              toggle-color="primary"
+              color="grey-3"
+              text-color="grey-8"
+              :options="[
+                { label: 'Geral', value: 'geral' },
+                { label: 'Por angariador', value: 'por_angariador' }
+              ]"
+            />
+          </div>
+        </div>
+      </q-card-section>
+      <q-separator />
+      <q-card-section v-if="modoChamadas === 'por_angariador'">
+        <div v-if="chamadasPorAngariador.length" class="row q-col-gutter-sm">
+          <div
+            v-for="item in chamadasPorAngariador.slice(0, 8)"
+            :key="`call-ang-${item.nome}`"
+            class="col-12 col-sm-6 col-md-4"
+          >
+            <div class="row items-center justify-between text-body2">
+              <span class="ellipsis">{{ item.nome }}</span>
+              <q-chip dense color="primary" text-color="white">{{ item.total }}</q-chip>
+            </div>
+          </div>
+        </div>
+        <div v-else class="text-caption text-grey-6">
+          Sem chamadas registadas no período seleccionado.
+        </div>
+      </q-card-section>
+      <q-card-section v-else>
+        <div class="text-body2 text-grey-8">
+          Total de chamadas registadas no período: <strong>{{ chamadasResumo.total }}</strong>
+        </div>
+      </q-card-section>
+    </q-card>
+
     <q-card v-if="mixPacotes.pacotes?.length" flat bordered class="stats-panel-card q-mb-lg">
       <q-card-section>
         <div class="text-subtitle1 text-weight-bold text-grey-9 q-mb-xs">
@@ -804,6 +852,8 @@ export default {
       angariadores: [],
     })
     const metasMensaisVisivel = ref(false)
+    const modoChamadas = ref('geral')
+    const chamadasResumo = ref({ total: 0, por_angariador: [] })
     const mesNome = ref('')
 
     const avisoTotaisPlataforma = computed(() => {
@@ -1041,6 +1091,15 @@ export default {
       const ang = r.total_angariados ?? 0
       const pctExp = ang > 0 ? ((exp / ang) * 100).toFixed(1) : '0'
       const pontos = r.total_pontos ?? 0
+      const chamadasTotal = chamadasResumo.value.total || 0
+      const chamadasTop = (chamadasResumo.value.por_angariador || [])[0]
+      const chamadasHint = modoChamadas.value === 'por_angariador'
+        ? (
+            chamadasTop
+              ? `${chamadasTop.nome}: ${chamadasTop.total} chamada(s) no período`
+              : 'Sem chamadas no período'
+          )
+        : `${chamadasTotal} chamada(s) no período`
       return [
         {
           key: 'leads',
@@ -1081,14 +1140,70 @@ export default {
         {
           key: 'chamadas',
           label: 'Chamadas registadas',
-          value: '—',
-          hint: 'Métrica em falta',
-          hintClass: 'text-negative',
-          valueClass: 'text-grey-6',
+          value: chamadasTotal,
+          hint: chamadasHint,
+          hintClass: chamadasTotal > 0 ? 'text-primary' : 'text-grey-7',
+          valueClass: chamadasTotal > 0 ? 'text-primary' : 'text-grey-6',
           colClass: 'col-12 col-md-4',
         },
       ]
     })
+
+    const chamadasPorAngariador = computed(() => chamadasResumo.value.por_angariador || [])
+
+    function getIntervaloPeriodoChamadas() {
+      if (periodo.value === 'mes') {
+        const inicio = new Date(ano.value, mes.value - 1, 1)
+        const fim = new Date(ano.value, mes.value, 0, 23, 59, 59, 999)
+        return { inicio, fim }
+      }
+      if (periodo.value === 'dia') {
+        const d = fromYMD(dataDiaPicker.value)
+        const inicio = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
+        const fim = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+        return { inicio, fim }
+      }
+      const d = fromYMD(dataSemanaPicker.value)
+      const s = startOfISOWeek(d)
+      const e = endOfISOWeek(d)
+      const inicio = new Date(s.getFullYear(), s.getMonth(), s.getDate(), 0, 0, 0, 0)
+      const fim = new Date(e.getFullYear(), e.getMonth(), e.getDate(), 23, 59, 59, 999)
+      return { inicio, fim }
+    }
+
+    function callInPeriodo(call, inicio, fim) {
+      const d = new Date(call?.called_at)
+      if (Number.isNaN(d.getTime())) return false
+      return d >= inicio && d <= fim
+    }
+
+    async function carregarChamadasRegistadas() {
+      try {
+        const resp = await api.get('/users/list/', { params: { no_payments: 1 } })
+        const users = Array.isArray(resp.data) ? resp.data : []
+        const { inicio, fim } = getIntervaloPeriodoChamadas()
+        const porAng = new Map()
+        let total = 0
+
+        users.forEach((u) => {
+          const calls = Array.isArray(u.follow_up_calls) ? u.follow_up_calls : []
+          calls.forEach((call) => {
+            if (!callInPeriodo(call, inicio, fim)) return
+            total += 1
+            const nome = call.staff_name || `Staff #${call.staff_user || '—'}`
+            porAng.set(nome, (porAng.get(nome) || 0) + 1)
+          })
+        })
+
+        const ordenado = [...porAng.entries()]
+          .map(([nome, totalCalls]) => ({ nome, total: totalCalls }))
+          .sort((a, b) => b.total - a.total)
+
+        chamadasResumo.value = { total, por_angariador: ordenado }
+      } catch {
+        chamadasResumo.value = { total: 0, por_angariador: [] }
+      }
+    }
 
     const alertaGlobalPlataforma = computed(() => {
       const taxaGlobal = resumo.value.taxa_conversao_global ?? 0
@@ -1338,6 +1453,7 @@ export default {
           body.metas_pacotes || body.metasPacotes,
           sorted
         )
+        await carregarChamadasRegistadas()
         mesNome.value = body.mes_nome || ''
         resultadoStatsOk.value = true
       } catch (err) {
@@ -1464,6 +1580,9 @@ export default {
       metasPacotes,
       metasAngariadores,
       metasMensaisVisivel,
+      modoChamadas,
+      chamadasResumo,
+      chamadasPorAngariador,
       classeChipMeta,
       tituloPeriodoGrafico,
       chartInstanceKey,
