@@ -24,7 +24,7 @@
     </div>
 
     <!-- Filtros -->
-    <q-card flat bordered class="stats-panel-card q-mb-lg">
+    <q-card flat bordered class="stats-panel-card stats-filters-sticky q-mb-lg">
       <q-card-section>
         <div class="row q-col-gutter-md items-center">
           <div class="col-12 col-md-auto">
@@ -196,6 +196,78 @@
       </div>
     </div>
 
+    <q-card v-if="mixPacotes.pacotes?.length" flat bordered class="stats-panel-card q-mb-lg">
+      <q-card-section>
+        <div class="text-subtitle1 text-weight-bold text-grey-9 q-mb-xs">
+          Pacotes mais vendidos no geral
+        </div>
+        <div class="text-caption text-grey-7 q-mb-md">
+          Todos os pagamentos concluídos no período (angariadores + app normal)
+          <span class="q-ml-xs">
+            · Total {{ pacotesGeral.total_pagamentos || 0 }}
+          </span>
+        </div>
+        <div class="stats-chart-wrap">
+          <Bar :data="chartPacotesGeraisData" :options="chartPacotesGeraisOptions" />
+        </div>
+        <div v-if="!chartPacotesGeraisTemDados" class="text-caption text-grey-6 text-center q-mt-sm">
+          Sem conversões por pacote neste período.
+        </div>
+      </q-card-section>
+    </q-card>
+
+    <q-separator class="q-my-xl" />
+
+    <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm section-label">
+      Metas e panorama
+    </div>
+
+    <!-- Snapshot plataforma -->
+    <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm section-label">
+      Panorama da plataforma · {{ textoReferenciaTemporal }}
+    </div>
+    <div class="row q-col-gutter-md q-mb-xl">
+      <div v-for="snap in snapshotsPlataforma" :key="snap.key" class="col-12 col-md-4">
+        <q-card flat bordered class="stats-snap-card" :class="snap.cardClass">
+          <q-card-section>
+            <div class="text-caption text-grey-8">{{ snap.title }}</div>
+            <div class="text-h5 text-weight-bold q-my-xs">{{ snap.leads }}</div>
+            <div class="text-body2 text-grey-7">
+              <span class="text-weight-medium text-positive">{{ snap.convertidos }}</span> convertidos
+              <span class="q-mx-xs">·</span>
+              <q-badge :color="snap.taxaColor" text-color="white" :label="`${snap.taxa}%`" />
+            </div>
+            <div class="text-caption text-grey-6 q-mt-sm">{{ snap.rotulo }}</div>
+          </q-card-section>
+        </q-card>
+      </div>
+    </div>
+
+    <q-card flat bordered class="stats-panel-card q-mb-xl">
+      <q-card-section>
+        <div class="text-subtitle1 text-weight-bold text-grey-9 q-mb-xs">
+          Indicadores de conformidade do período
+        </div>
+        <div class="text-caption text-grey-7 q-mb-md">
+          Totais globais da consulta actual
+        </div>
+        <div class="row q-col-gutter-md">
+          <div class="col-12 col-md-6">
+            <div class="text-caption text-grey-7">Convertidos fora dos 15 min</div>
+            <div class="text-h5 text-weight-bold text-warning q-mt-xs">
+              {{ resumo.total_convertidos_fora_15m ?? 0 }}
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="text-caption text-grey-7">Planos desbloqueados no painel</div>
+            <div class="text-h5 text-weight-bold text-info q-mt-xs">
+              {{ resumo.total_convertidos_via_painel ?? 0 }}
+            </div>
+          </div>
+        </div>
+      </q-card-section>
+    </q-card>
+
     <div class="stats-section-title q-mb-md q-mt-lg">
       PERFORMANCE POR ANGARIADOR
     </div>
@@ -271,6 +343,39 @@
                 <span>Expirados</span>
                 <strong>{{ row.pending_expirados }}</strong>
               </div>
+              <div class="stats-metric-row">
+                <span>Convertidos fora 15 min</span>
+                <strong :class="(row.convertidos_fora_15m || 0) > 0 ? 'text-warning' : ''">
+                  {{ row.convertidos_fora_15m ?? 0 }}
+                </strong>
+              </div>
+              <div class="stats-metric-row">
+                <span>Planos desbloqueados no painel</span>
+                <strong :class="(row.convertidos_via_painel || 0) > 0 ? 'text-info' : ''">
+                  {{ row.convertidos_via_painel ?? 0 }}
+                </strong>
+              </div>
+            </div>
+
+            <div class="q-mt-sm">
+              <div class="text-caption text-grey-7 q-mb-xs">Pacotes mais vendidos</div>
+              <div
+                v-if="topPacotesAngariador(row).length"
+                class="row items-center q-col-gutter-xs"
+              >
+                <div
+                  v-for="pkg in topPacotesAngariador(row)"
+                  :key="`pkg-${chaveAngariador(row)}-${pkg.nome}`"
+                  class="col-auto"
+                >
+                  <q-chip dense outline color="primary">
+                    {{ pkg.nome }} · {{ pkg.total }}
+                  </q-chip>
+                </div>
+              </div>
+              <div v-else class="text-caption text-grey-6">
+                Sem conversões por pacote neste período.
+              </div>
             </div>
 
             <div class="q-mt-lg">
@@ -309,33 +414,6 @@
         </div>
       </div>
     </template>
-
-    <q-separator class="q-my-xl" />
-
-    <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm section-label">
-      Metas e panorama
-    </div>
-
-    <!-- Snapshot plataforma -->
-    <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm section-label">
-      Panorama da plataforma · {{ textoReferenciaTemporal }}
-    </div>
-    <div class="row q-col-gutter-md q-mb-xl">
-      <div v-for="snap in snapshotsPlataforma" :key="snap.key" class="col-12 col-md-4">
-        <q-card flat bordered class="stats-snap-card" :class="snap.cardClass">
-          <q-card-section>
-            <div class="text-caption text-grey-8">{{ snap.title }}</div>
-            <div class="text-h5 text-weight-bold q-my-xs">{{ snap.leads }}</div>
-            <div class="text-body2 text-grey-7">
-              <span class="text-weight-medium text-positive">{{ snap.convertidos }}</span> convertidos
-              <span class="q-mx-xs">·</span>
-              <q-badge :color="snap.taxaColor" text-color="white" :label="`${snap.taxa}%`" />
-            </div>
-            <div class="text-caption text-grey-6 q-mt-sm">{{ snap.rotulo }}</div>
-          </q-card-section>
-        </q-card>
-      </div>
-    </div>
 
     <!-- Mix de pacotes — barras agrupadas (top 4 angariadores) -->
     <q-card v-if="resultados.length" flat bordered class="stats-panel-card q-mb-xl">
@@ -710,6 +788,13 @@ export default {
     const resultadoStatsOk = ref(false)
     const resultados = ref([])
     const mixPacotes = ref({ pacotes: [], angariadores: [] })
+    const pacotesGeral = ref({
+      pacotes: [],
+      totais: [],
+      total_pagamentos: 0,
+      total_via_angariacao: 0,
+      total_pagamentos_normais: 0,
+    })
     const metasPacotes = ref({
       pacotes: [],
       metas_diarias: [],
@@ -851,6 +936,60 @@ export default {
         }),
       }
     })
+
+    const chartPacotesGeraisTotais = computed(() => {
+      const labels = pacotesGeral.value.pacotes?.length
+        ? pacotesGeral.value.pacotes
+        : PACOTES_LABELS_FALLBACK
+      if (Array.isArray(pacotesGeral.value.totais) && pacotesGeral.value.totais.length) {
+        return labels.map((_, idx) => Number(pacotesGeral.value.totais[idx] || 0))
+      }
+      const fallback = labels.map(() => 0)
+      ;(mixPacotes.value.angariadores || []).forEach((ang) => {
+        labels.forEach((_, idx) => {
+          fallback[idx] += Number((ang.valores || [])[idx] || 0)
+        })
+      })
+      return fallback
+    })
+
+    const chartPacotesGeraisTemDados = computed(() => {
+      return chartPacotesGeraisTotais.value.some((v) => v > 0)
+    })
+
+    const chartPacotesGeraisData = computed(() => {
+      const labels = pacotesGeral.value.pacotes?.length
+        ? pacotesGeral.value.pacotes
+        : PACOTES_LABELS_FALLBACK
+      return {
+        labels,
+        datasets: [
+          {
+            label: 'Total vendido',
+            data: chartPacotesGeraisTotais.value,
+            backgroundColor: 'rgba(25, 118, 210, 0.82)',
+            borderRadius: 6,
+            maxBarThickness: 42,
+          },
+        ],
+      }
+    })
+
+    const chartPacotesGeraisOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0, stepSize: 1 },
+          grid: { color: 'rgba(0,0,0,0.06)' },
+        },
+      },
+    }
 
     const chartOptions = {
       responsive: true,
@@ -1000,6 +1139,19 @@ export default {
       const alerta = alertaAngariador(row)
       if (alerta) return alerta
       return `Taxa ${row.taxa_conversao}% · ${row.total_convertidos} convertidos · ${row.total_angariados} leads angariados.`
+    }
+
+    function topPacotesAngariador(row) {
+      const pacotes = mixPacotes.value?.pacotes || []
+      const angs = mixPacotes.value?.angariadores || []
+      const rowKey = String(row?.angariador_id ?? row?.id ?? '')
+      const match = angs.find((a) => String(a?.angariador_id ?? a?.id ?? '') === rowKey)
+      if (!match || !Array.isArray(match.valores)) return []
+      return pacotes
+        .map((nome, idx) => ({ nome, total: Number(match.valores[idx] || 0) }))
+        .filter((p) => p.total > 0)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 3)
     }
 
     const snapshotsPlataforma = computed(() => {
@@ -1174,6 +1326,14 @@ export default {
           body.mix_pacotes || body.mixPacotes,
           sorted
         )
+        const pg = body.pacotes_geral || body.pacotesGeral || {}
+        pacotesGeral.value = {
+          pacotes: pg.pacotes || PACOTES_LABELS_FALLBACK,
+          totais: pg.totais || [],
+          total_pagamentos: pg.total_pagamentos || 0,
+          total_via_angariacao: pg.total_via_angariacao || 0,
+          total_pagamentos_normais: pg.total_pagamentos_normais || 0,
+        }
         metasPacotes.value = enriquecerMetasPacotes(
           body.metas_pacotes || body.metasPacotes,
           sorted
@@ -1211,6 +1371,8 @@ export default {
         'total_convertidos',
         'pending_activos',
         'pending_expirados',
+        'convertidos_fora_15m',
+        'convertidos_via_painel',
         'total_pontos',
         'taxa_conversao',
       ]
@@ -1241,6 +1403,8 @@ export default {
             row.total_convertidos,
             row.pending_activos,
             row.pending_expirados,
+            row.convertidos_fora_15m ?? 0,
+            row.convertidos_via_painel ?? 0,
             row.total_pontos,
             row.taxa_conversao,
           ]
@@ -1296,6 +1460,7 @@ export default {
       textoBannerAngariador,
       maxAngariados,
       mixPacotes,
+      pacotesGeral,
       metasPacotes,
       metasAngariadores,
       metasMensaisVisivel,
@@ -1304,6 +1469,9 @@ export default {
       chartInstanceKey,
       chartMostrar,
       chartTemDados,
+      chartPacotesGeraisTemDados,
+      chartPacotesGeraisData,
+      chartPacotesGeraisOptions,
       chartData,
       chartOptions,
       labelAngariadorGrafico,
@@ -1312,6 +1480,7 @@ export default {
       rotuloMetaPeriodo,
       alertaGlobalPlataforma,
       alertaAngariador,
+      topPacotesAngariador,
       snapshotsPlataforma,
       iniciais,
       corTaxa,
@@ -1343,6 +1512,13 @@ export default {
   background: #fff;
   border-radius: 12px;
   border-color: rgba(0, 0, 0, 0.08);
+}
+
+.stats-filters-sticky {
+  position: sticky;
+  top: 72px;
+  z-index: 20;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
 }
 
 .stats-alert-banner {
