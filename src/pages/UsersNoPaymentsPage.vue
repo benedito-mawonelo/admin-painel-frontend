@@ -59,6 +59,7 @@
           :columns="columns"
           row-key="id"
           :loading="loading"
+          v-model:pagination="pagination"
           flat
           bordered
           :rows-per-page-options="[10, 25, 50]"
@@ -167,7 +168,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api } from 'boot/axios'
@@ -181,6 +182,9 @@ const columns = [
   { name: 'actions', label: 'Ações', align: 'center' },
 ]
 
+const AUTO_REFRESH_MS = 30000
+const STORAGE_KEY = 'users-no-payments-state-v1'
+
 export default {
   name: 'UsersNoPaymentsPage',
 
@@ -191,10 +195,17 @@ export default {
     const rows = ref([])
     const dateFrom = ref('')
     const dateTo = ref('')
+    const pagination = ref({
+      sortBy: 'data_registo',
+      descending: true,
+      page: 1,
+      rowsPerPage: 10,
+    })
     const dialogRegistarLigacao = ref(false)
     const targetUserForCall = ref(null)
     const savingCall = ref(false)
     const novaLigacaoData = ref('')
+    let refreshTimer = null
 
     function formatDate(val) {
       if (!val) return '—'
@@ -203,8 +214,44 @@ export default {
       return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
     }
 
-    async function loadUsers() {
-      loading.value = true
+    function saveState() {
+      try {
+        const payload = {
+          dateFrom: dateFrom.value || '',
+          dateTo: dateTo.value || '',
+          pagination: pagination.value,
+          scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+      } catch {
+        // ignore storage issues
+      }
+    }
+
+    function restoreState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        dateFrom.value = parsed.dateFrom || ''
+        dateTo.value = parsed.dateTo || ''
+        if (parsed.pagination && typeof parsed.pagination === 'object') {
+          pagination.value = { ...pagination.value, ...parsed.pagination }
+        }
+        if (typeof parsed.scrollY === 'number') {
+          nextTick(() => {
+            window.scrollTo({ top: parsed.scrollY, behavior: 'auto' })
+          })
+        }
+      } catch {
+        // ignore malformed state
+      }
+    }
+
+    async function loadUsers(options = {}) {
+      const { silent = false, preservePosition = false } = options
+      const previousScrollY = preservePosition ? window.scrollY : 0
+      if (!silent) loading.value = true
       try {
         const params = new URLSearchParams()
         params.set('no_payments', '1')
@@ -217,13 +264,17 @@ export default {
           name: [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.username || '—',
           follow_up_calls: u.follow_up_calls || [],
         }))
+        if (preservePosition) {
+          await nextTick()
+          window.scrollTo({ top: previousScrollY, behavior: 'auto' })
+        }
       } catch (err) {
         console.error('Erro ao carregar utilizadores sem pagamento:', err)
-        rows.value = []
+        if (!silent) rows.value = []
         const msg = err.response?.data?.detail || err.response?.data?.error || 'Erro ao carregar lista'
-        $q.notify({ type: 'negative', message: msg })
+        if (!silent) $q.notify({ type: 'negative', message: msg })
       } finally {
-        loading.value = false
+        if (!silent) loading.value = false
       }
     }
 
@@ -269,8 +320,20 @@ export default {
     }
 
     onMounted(() => {
+      restoreState()
       loadUsers()
+      refreshTimer = setInterval(() => {
+        if (dialogRegistarLigacao.value || savingCall.value) return
+        loadUsers({ silent: true, preservePosition: true })
+      }, AUTO_REFRESH_MS)
     })
+
+    onBeforeUnmount(() => {
+      if (refreshTimer) clearInterval(refreshTimer)
+    })
+
+    watch([dateFrom, dateTo], saveState)
+    watch(pagination, saveState, { deep: true })
 
     return {
       loading,
@@ -278,6 +341,7 @@ export default {
       columns,
       dateFrom,
       dateTo,
+      pagination,
       formatDate,
       loadUsers,
       clearDates,

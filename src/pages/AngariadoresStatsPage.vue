@@ -672,7 +672,7 @@ const PACOTES_LABELS_FALLBACK = [
   'Práticas P.',
 ]
 
-const METAS_DIARIAS_FALLBACK = [6, 3, 2, 3, 3, 3]
+const METAS_DIARIAS_FALLBACK = [6, 3, 5, 2, 3, 3]
 const METAS_MENSAIS_FALLBACK = METAS_DIARIAS_FALLBACK.map((m) => m * 22)
 
 function chaveAngariador(row) {
