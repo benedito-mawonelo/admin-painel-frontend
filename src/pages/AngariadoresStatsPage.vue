@@ -142,6 +142,52 @@
             />
           </div>
 
+          <template v-if="compararPeriodo">
+            <div class="col-12 col-md-3">
+              <q-input
+                v-model="dataComparacaoInicioDisplay"
+                outlined
+                dense
+                readonly
+                label="Comparação: data início"
+                :hint="hintComparacaoRange"
+              >
+                <template v-slot:append>
+                  <q-icon name="event" class="cursor-pointer">
+                    <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                      <q-date v-model="dataComparacaoInicio" mask="YYYY-MM-DD" minimal>
+                        <div class="row items-center justify-end q-gutter-sm q-pa-sm">
+                          <q-btn v-close-popup label="Fechar" color="primary" flat />
+                        </div>
+                      </q-date>
+                    </q-popup-proxy>
+                  </q-icon>
+                </template>
+              </q-input>
+            </div>
+            <div class="col-12 col-md-3">
+              <q-input
+                v-model="dataComparacaoFimDisplay"
+                outlined
+                dense
+                readonly
+                label="Comparação: data fim"
+              >
+                <template v-slot:append>
+                  <q-icon name="event" class="cursor-pointer">
+                    <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                      <q-date v-model="dataComparacaoFim" mask="YYYY-MM-DD" minimal>
+                        <div class="row items-center justify-end q-gutter-sm q-pa-sm">
+                          <q-btn v-close-popup label="Fechar" color="primary" flat />
+                        </div>
+                      </q-date>
+                    </q-popup-proxy>
+                  </q-icon>
+                </template>
+              </q-input>
+            </div>
+          </template>
+
           <div class="col-12 col-md-auto">
             <q-btn
               color="primary"
@@ -975,6 +1021,8 @@ export default {
     const hojeIso = format(now, 'yyyy-MM-dd')
     const dataDiaPicker = ref(hojeIso)
     const dataSemanaPicker = ref(hojeIso)
+    const dataComparacaoInicio = ref('')
+    const dataComparacaoFim = ref('')
     const q = ref('')
     const angariadorSeleccionado = ref(null)
     const angariadorOptions = ref([])
@@ -1054,6 +1102,63 @@ export default {
       return `Semana ISO ${w}/${yIso} · ${format(s, 'd MMM', { locale: pt })} – ${format(e, 'd MMM yyyy', { locale: pt })}`
     })
 
+    const dataComparacaoInicioDisplay = computed(() => {
+      const d = fromYMD(dataComparacaoInicio.value)
+      if (Number.isNaN(d.getTime())) return ''
+      return format(d, "EEEE, d 'de' MMMM 'de' yyyy", { locale: pt })
+    })
+
+    const dataComparacaoFimDisplay = computed(() => {
+      const d = fromYMD(dataComparacaoFim.value)
+      if (Number.isNaN(d.getTime())) return ''
+      return format(d, "EEEE, d 'de' MMMM 'de' yyyy", { locale: pt })
+    })
+
+    const hintComparacaoRange = computed(() => {
+      return 'Se vazio, usa o período anterior automático'
+    })
+
+    function getIntervaloAnteriorAutomatico() {
+      if (periodo.value === 'mes') {
+        let m = mes.value - 1
+        let y = ano.value
+        if (m < 1) {
+          m = 12
+          y -= 1
+        }
+        const inicio = new Date(y, m - 1, 1)
+        const fim = new Date(y, m, 0)
+        return {
+          inicio: format(inicio, 'yyyy-MM-dd'),
+          fim: format(fim, 'yyyy-MM-dd'),
+        }
+      }
+      if (periodo.value === 'dia') {
+        const d = fromYMD(dataDiaPicker.value)
+        if (Number.isNaN(d.getTime())) {
+          return { inicio: dataDiaPicker.value, fim: dataDiaPicker.value }
+        }
+        const prev = subDays(d, 1)
+        const s = format(prev, 'yyyy-MM-dd')
+        return { inicio: s, fim: s }
+      }
+      const d = fromYMD(dataSemanaPicker.value)
+      if (Number.isNaN(d.getTime())) return { inicio: '', fim: '' }
+      const prev = subDays(d, 7)
+      const s = startOfISOWeek(prev)
+      const e = endOfISOWeek(prev)
+      return {
+        inicio: format(s, 'yyyy-MM-dd'),
+        fim: format(e, 'yyyy-MM-dd'),
+      }
+    }
+
+    function syncComparacaoDefault() {
+      const auto = getIntervaloAnteriorAutomatico()
+      dataComparacaoInicio.value = auto.inicio || ''
+      dataComparacaoFim.value = auto.fim || ''
+    }
+
     const tituloResultados = computed(() => {
       if (periodo.value === 'mes') {
         if (mesNome.value) return `${mesNome.value} / ${ano.value}`
@@ -1066,31 +1171,16 @@ export default {
     })
 
     const tituloPeriodoAnterior = computed(() => {
-      if (periodo.value === 'mes') {
-        let m = mes.value - 1
-        let y = ano.value
-        if (m < 1) {
-          m = 12
-          y -= 1
-        }
-        const d = new Date(y, m - 1, 1)
-        if (Number.isNaN(d.getTime())) return '—'
-        return format(d, 'MMMM yyyy', { locale: pt })
+      const d0 = fromYMD(dataComparacaoInicio.value)
+      const d1 = fromYMD(dataComparacaoFim.value)
+      if (!Number.isNaN(d0.getTime()) && !Number.isNaN(d1.getTime())) {
+        return `${format(d0, 'd MMM yyyy', { locale: pt })} – ${format(d1, 'd MMM yyyy', { locale: pt })}`
       }
-      if (periodo.value === 'dia') {
-        const d = fromYMD(dataDiaPicker.value)
-        if (Number.isNaN(d.getTime())) return '—'
-        const prev = subDays(d, 1)
-        return format(prev, "EEEE, d 'de' MMMM 'de' yyyy", { locale: pt })
-      }
-      const d = fromYMD(dataSemanaPicker.value)
-      if (Number.isNaN(d.getTime())) return '—'
-      const prev = subDays(d, 7)
-      const s = startOfISOWeek(prev)
-      const e = endOfISOWeek(prev)
-      const w = getISOWeek(prev)
-      const yIso = getISOWeekYear(prev)
-      return `Semana ISO ${w}/${yIso} · ${format(s, 'd MMM', { locale: pt })} – ${format(e, 'd MMM yyyy', { locale: pt })}`
+      const auto = getIntervaloAnteriorAutomatico()
+      const da = fromYMD(auto.inicio)
+      const db = fromYMD(auto.fim)
+      if (Number.isNaN(da.getTime()) || Number.isNaN(db.getTime())) return '—'
+      return `${format(da, 'd MMM yyyy', { locale: pt })} – ${format(db, 'd MMM yyyy', { locale: pt })}`
     })
 
     const comparacaoDisponivel = computed(() => {
@@ -1685,31 +1775,24 @@ export default {
 
     function buildQueryParamsAnterior() {
       const base = buildQueryParamsBase()
-      if (periodo.value === 'mes') {
-        let m = mes.value - 1
-        let y = ano.value
-        if (m < 1) {
-          m = 12
-          y -= 1
+      const d0 = fromYMD(dataComparacaoInicio.value)
+      const d1 = fromYMD(dataComparacaoFim.value)
+      if (!Number.isNaN(d0.getTime()) && !Number.isNaN(d1.getTime())) {
+        const inicio = d0 <= d1 ? dataComparacaoInicio.value : dataComparacaoFim.value
+        const fim = d0 <= d1 ? dataComparacaoFim.value : dataComparacaoInicio.value
+        return {
+          ...base,
+          periodo: 'semana',
+          data_inicio: inicio,
+          data_fim: fim,
         }
-        return { ...base, mes: m, ano: y }
       }
-      if (periodo.value === 'dia') {
-        const d = fromYMD(dataDiaPicker.value)
-        if (Number.isNaN(d.getTime())) return { ...base, data: dataDiaPicker.value }
-        return { ...base, data: format(subDays(d, 1), 'yyyy-MM-dd') }
-      }
-      const d = fromYMD(dataSemanaPicker.value)
-      if (Number.isNaN(d.getTime())) return base
-      const prev = subDays(d, 7)
-      const inicio = startOfISOWeek(prev)
-      const fim = endOfISOWeek(prev)
+      const auto = getIntervaloAnteriorAutomatico()
       return {
         ...base,
-        semana: getISOWeek(prev),
-        ano: getISOWeekYear(prev),
-        data_inicio: format(inicio, 'yyyy-MM-dd'),
-        data_fim: format(fim, 'yyyy-MM-dd'),
+        periodo: 'semana',
+        data_inicio: auto.inicio,
+        data_fim: auto.fim,
       }
     }
 
@@ -1865,14 +1948,23 @@ export default {
     }
 
     watch(periodo, () => {
+      syncComparacaoDefault()
       carregar()
     })
 
     watch([mes, ano, dataDiaPicker, dataSemanaPicker], () => {
+      syncComparacaoDefault()
       if (!loading.value) carregar()
     })
 
-    onMounted(carregar)
+    watch([dataComparacaoInicio, dataComparacaoFim, compararPeriodo], () => {
+      if (!loading.value) carregar()
+    })
+
+    onMounted(() => {
+      syncComparacaoDefault()
+      carregar()
+    })
 
     return {
       periodo,
@@ -1886,6 +1978,11 @@ export default {
       ano,
       dataDiaPicker,
       dataSemanaPicker,
+      dataComparacaoInicio,
+      dataComparacaoFim,
+      dataComparacaoInicioDisplay,
+      dataComparacaoFimDisplay,
+      hintComparacaoRange,
       dataDiaDisplay,
       dataSemanaDisplay,
       intervaloSemanaHint,
