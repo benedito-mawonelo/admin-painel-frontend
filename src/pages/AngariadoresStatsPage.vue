@@ -133,6 +133,16 @@
           </div>
 
           <div class="col-12 col-md-auto">
+            <q-toggle
+              v-model="compararPeriodo"
+              dense
+              color="primary"
+              label="Comparar com período anterior"
+              @update:model-value="carregar"
+            />
+          </div>
+
+          <div class="col-12 col-md-auto">
             <q-btn
               color="primary"
               icon="refresh"
@@ -191,10 +201,112 @@
             <div class="text-caption" :class="kpi.hintClass">
               {{ kpi.hint }}
             </div>
+            <div
+              v-if="kpi.comparacao"
+              class="text-caption text-weight-medium q-mt-xs"
+              :class="kpi.comparacao.class"
+            >
+              <q-icon :name="kpi.comparacao.icon" size="14px" class="q-mr-xs" />
+              {{ kpi.comparacao.label }}
+              <span class="text-grey-6"> vs {{ tituloPeriodoAnterior }}</span>
+            </div>
           </q-card-section>
         </q-card>
       </div>
     </div>
+
+    <!-- Comparativo período actual vs anterior -->
+    <q-card
+      v-if="compararPeriodo && comparacaoDisponivel"
+      flat
+      bordered
+      class="stats-panel-card stats-compare-card q-mb-lg"
+    >
+      <q-card-section>
+        <div class="row items-center q-col-gutter-md q-mb-md">
+          <div class="col">
+            <div class="text-subtitle1 text-weight-bold text-grey-9">
+              Comparativo de períodos
+            </div>
+            <div class="text-caption text-grey-7">
+              {{ tituloResultados }}
+              <q-icon name="compare_arrows" size="16px" class="q-mx-xs" />
+              {{ tituloPeriodoAnterior }}
+            </div>
+          </div>
+        </div>
+        <div class="row q-col-gutter-md q-mb-lg">
+          <div
+            v-for="bloco in comparativoResumoBlocos"
+            :key="bloco.key"
+            class="col-12 col-sm-6 col-md-3"
+          >
+            <div class="stats-compare-metric">
+              <div class="text-caption text-grey-7">{{ bloco.label }}</div>
+              <div class="row items-baseline q-gutter-sm q-mt-xs">
+                <span class="text-h6 text-weight-bold">{{ bloco.actual }}</span>
+                <span class="text-body2 text-grey-6">/ {{ bloco.anterior }}</span>
+              </div>
+              <div class="text-caption q-mt-xs" :class="bloco.variacao.class">
+                <q-icon :name="bloco.variacao.icon" size="14px" class="q-mr-xs" />
+                {{ bloco.variacao.label }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm">
+          Por angariador
+        </div>
+        <q-markup-table flat bordered separator="horizontal" class="stats-compare-table">
+          <thead>
+            <tr>
+              <th class="text-left">Angariador</th>
+              <th class="text-center">Leads</th>
+              <th class="text-center">Convertidos</th>
+              <th class="text-center">Pontos</th>
+              <th class="text-center">Taxa conv.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in resultadosComparacao" :key="`cmp-${row.angariador_id}`">
+              <td class="text-weight-medium">{{ row.nome }}</td>
+              <td class="text-center">
+                <div>{{ row.total_angariados }}</div>
+                <div class="text-caption text-grey-6">
+                  ant. {{ row.anterior.total_angariados }}
+                  <span :class="row.variacao.leads.class"> · {{ row.variacao.leads.label }}</span>
+                </div>
+              </td>
+              <td class="text-center">
+                <div>{{ row.total_convertidos }}</div>
+                <div class="text-caption text-grey-6">
+                  ant. {{ row.anterior.total_convertidos }}
+                  <span :class="row.variacao.convertidos.class"> · {{ row.variacao.convertidos.label }}</span>
+                </div>
+              </td>
+              <td class="text-center">
+                <div>{{ row.total_pontos }}</div>
+                <div class="text-caption text-grey-6">
+                  ant. {{ row.anterior.total_pontos }}
+                  <span :class="row.variacao.pontos.class"> · {{ row.variacao.pontos.label }}</span>
+                </div>
+              </td>
+              <td class="text-center">
+                <div>{{ row.taxa_conversao }}%</div>
+                <div class="text-caption text-grey-6">
+                  ant. {{ row.anterior.taxa_conversao }}%
+                  <span :class="row.variacao.taxa.class"> · {{ row.variacao.taxa.label }}</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </q-markup-table>
+        <div v-if="!resultadosComparacao.length" class="text-caption text-grey-6 q-mt-md text-center">
+          Sem dados nos dois períodos para comparar.
+        </div>
+      </q-card-section>
+    </q-card>
 
     <q-card flat bordered class="stats-panel-card q-mb-lg">
       <q-card-section class="q-py-sm">
@@ -377,11 +489,29 @@
             <div class="stats-metric-list stats-metric-list--ref">
               <div class="stats-metric-row">
                 <span>Leads angariados</span>
-                <strong>{{ row.total_angariados }}</strong>
+                <strong>
+                  {{ row.total_angariados }}
+                  <span
+                    v-if="variacaoAngariador(row, 'total_angariados')"
+                    class="text-caption q-ml-xs"
+                    :class="variacaoAngariador(row, 'total_angariados').class"
+                  >
+                    {{ variacaoAngariador(row, 'total_angariados').label }}
+                  </span>
+                </strong>
               </div>
               <div class="stats-metric-row">
                 <span>Convertidos</span>
-                <strong>{{ row.total_convertidos }}</strong>
+                <strong>
+                  {{ row.total_convertidos }}
+                  <span
+                    v-if="variacaoAngariador(row, 'total_convertidos')"
+                    class="text-caption q-ml-xs"
+                    :class="variacaoAngariador(row, 'total_convertidos').class"
+                  >
+                    {{ variacaoAngariador(row, 'total_convertidos').label }}
+                  </span>
+                </strong>
               </div>
               <div class="stats-metric-row">
                 <span>Pending ativos</span>
@@ -608,6 +738,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import {
   format,
+  subDays,
   startOfISOWeek,
   endOfISOWeek,
   getISOWeek,
@@ -643,6 +774,23 @@ function fromYMD(ymd) {
   if (parts.length !== 3 || parts.some(Number.isNaN)) return new Date(NaN)
   const [y, m, d] = parts
   return new Date(y, m - 1, d)
+}
+
+function calcVariacao(actual, anterior) {
+  const a = Number(actual) || 0
+  const p = Number(anterior) || 0
+  const delta = a - p
+  if (delta === 0) {
+    return { delta: 0, label: 'igual', class: 'text-grey-7', icon: 'remove' }
+  }
+  const pct = p > 0 ? Math.round((delta / p) * 1000) / 10 : null
+  const sinal = delta > 0 ? '+' : ''
+  const pctTxt = pct != null ? ` (${sinal}${pct}%)` : ''
+  const label = `${sinal}${delta}${pctTxt}`
+  if (delta > 0) {
+    return { delta, label, class: 'text-positive', icon: 'trending_up' }
+  }
+  return { delta, label, class: 'text-negative', icon: 'trending_down' }
 }
 
 function iniciais(nome) {
@@ -821,6 +969,7 @@ export default {
     const $q = useQuasar()
     const now = new Date()
     const periodo = ref('mes')
+    const compararPeriodo = ref(true)
     const mes = ref(now.getMonth() + 1)
     const ano = ref(now.getFullYear())
     const hojeIso = format(now, 'yyyy-MM-dd')
@@ -835,6 +984,9 @@ export default {
     const totaisPlataforma = ref({})
     const resultadoStatsOk = ref(false)
     const resultados = ref([])
+    const resumoAnterior = ref(null)
+    const resultadosAnterior = ref([])
+    const comparacaoCarregada = ref(false)
     const mixPacotes = ref({ pacotes: [], angariadores: [] })
     const pacotesGeral = ref({
       pacotes: [],
@@ -911,6 +1063,118 @@ export default {
       }
       if (periodo.value === 'dia') return dataDiaDisplay.value || '—'
       return intervaloSemanaHint.value || '—'
+    })
+
+    const tituloPeriodoAnterior = computed(() => {
+      if (periodo.value === 'mes') {
+        let m = mes.value - 1
+        let y = ano.value
+        if (m < 1) {
+          m = 12
+          y -= 1
+        }
+        const d = new Date(y, m - 1, 1)
+        if (Number.isNaN(d.getTime())) return '—'
+        return format(d, 'MMMM yyyy', { locale: pt })
+      }
+      if (periodo.value === 'dia') {
+        const d = fromYMD(dataDiaPicker.value)
+        if (Number.isNaN(d.getTime())) return '—'
+        const prev = subDays(d, 1)
+        return format(prev, "EEEE, d 'de' MMMM 'de' yyyy", { locale: pt })
+      }
+      const d = fromYMD(dataSemanaPicker.value)
+      if (Number.isNaN(d.getTime())) return '—'
+      const prev = subDays(d, 7)
+      const s = startOfISOWeek(prev)
+      const e = endOfISOWeek(prev)
+      const w = getISOWeek(prev)
+      const yIso = getISOWeekYear(prev)
+      return `Semana ISO ${w}/${yIso} · ${format(s, 'd MMM', { locale: pt })} – ${format(e, 'd MMM yyyy', { locale: pt })}`
+    })
+
+    const comparacaoDisponivel = computed(() => {
+      return compararPeriodo.value && comparacaoCarregada.value && resumoAnterior.value != null
+    })
+
+    const mapaResultadosAnterior = computed(() => {
+      const m = new Map()
+      ;(resultadosAnterior.value || []).forEach((r) => {
+        m.set(r.angariador_id, r)
+      })
+      return m
+    })
+
+    function variacaoAngariador(row, campo) {
+      if (!comparacaoDisponivel.value) return null
+      const ant = mapaResultadosAnterior.value.get(row.angariador_id)
+      if (!ant) {
+        const a = Number(row[campo]) || 0
+        if (a === 0) return null
+        return calcVariacao(a, 0)
+      }
+      return calcVariacao(row[campo], ant[campo])
+    }
+
+    const comparativoResumoBlocos = computed(() => {
+      if (!comparacaoDisponivel.value) return []
+      const r = resumo.value
+      const a = resumoAnterior.value
+      const mk = (key, label, campo) => ({
+        key,
+        label,
+        actual: r[campo] ?? 0,
+        anterior: a[campo] ?? 0,
+        variacao: calcVariacao(r[campo], a[campo]),
+      })
+      return [
+        mk('leads', 'Leads angariados', 'total_angariados'),
+        mk('conv', 'Convertidos', 'total_convertidos'),
+        mk('pts', 'Pontos', 'total_pontos'),
+        mk('taxa', 'Taxa conversão (%)', 'taxa_conversao_global'),
+      ]
+    })
+
+    const resultadosComparacao = computed(() => {
+      if (!comparacaoDisponivel.value) return []
+      const prevMap = mapaResultadosAnterior.value
+      const ids = new Set([
+        ...resultados.value.map((r) => r.angariador_id),
+        ...resultadosAnterior.value.map((r) => r.angariador_id),
+      ])
+      const linhas = [...ids].map((id) => {
+        const atual =
+          resultados.value.find((r) => r.angariador_id === id) ||
+          resultadosAnterior.value.find((r) => r.angariador_id === id)
+        const anterior = prevMap.get(id) || {
+          total_angariados: 0,
+          total_convertidos: 0,
+          total_pontos: 0,
+          taxa_conversao: 0,
+        }
+        const row = resultados.value.find((r) => r.angariador_id === id) || {
+          angariador_id: id,
+          nome: atual?.nome || `ID ${id}`,
+          total_angariados: 0,
+          total_convertidos: 0,
+          total_pontos: 0,
+          taxa_conversao: 0,
+        }
+        return {
+          ...row,
+          anterior,
+          variacao: {
+            leads: calcVariacao(row.total_angariados, anterior.total_angariados),
+            convertidos: calcVariacao(row.total_convertidos, anterior.total_convertidos),
+            pontos: calcVariacao(row.total_pontos, anterior.total_pontos),
+            taxa: calcVariacao(row.taxa_conversao, anterior.taxa_conversao),
+          },
+        }
+      })
+      return linhas.sort((x, y) => {
+        if (y.total_pontos !== x.total_pontos) return y.total_pontos - x.total_pontos
+        return y.total_convertidos - x.total_convertidos
+      })
     })
 
     const resultadosOrdenados = computed(() => {
@@ -1086,6 +1350,8 @@ export default {
 
     const kpisTopo = computed(() => {
       const r = resumo.value
+      const ra = resumoAnterior.value
+      const cmp = comparacaoDisponivel.value
       const taxa = r.taxa_conversao_global ?? 0
       const exp = r.pending_expirados ?? 0
       const ang = r.total_angariados ?? 0
@@ -1100,6 +1366,7 @@ export default {
               : 'Sem chamadas no período'
           )
         : `${chamadasTotal} chamada(s) no período`
+      const kpiCmp = (campo) => (cmp && ra ? calcVariacao(r[campo], ra[campo]) : null)
       return [
         {
           key: 'leads',
@@ -1109,6 +1376,7 @@ export default {
           hintClass: 'text-grey-7',
           valueClass: 'text-grey-9',
           colClass: 'col-sm-6 col-md-3',
+          comparacao: kpiCmp('total_angariados'),
         },
         {
           key: 'conv',
@@ -1118,6 +1386,7 @@ export default {
           hintClass: taxa >= 30 ? 'text-positive' : 'text-warning',
           valueClass: 'text-grey-9',
           colClass: 'col-sm-6 col-md-3',
+          comparacao: kpiCmp('total_convertidos'),
         },
         {
           key: 'receita',
@@ -1127,6 +1396,7 @@ export default {
           hintClass: 'text-grey-7',
           valueClass: 'text-grey-9',
           colClass: 'col-sm-6 col-md-3',
+          comparacao: kpiCmp('total_pontos'),
         },
         {
           key: 'exp',
@@ -1136,6 +1406,7 @@ export default {
           hintClass: exp > 0 ? 'text-negative' : 'text-grey-7',
           valueClass: exp > 0 ? 'text-negative' : 'text-grey-9',
           colClass: 'col-sm-6 col-md-3',
+          comparacao: kpiCmp('pending_expirados'),
         },
         {
           key: 'chamadas',
@@ -1145,6 +1416,7 @@ export default {
           hintClass: chamadasTotal > 0 ? 'text-primary' : 'text-grey-7',
           valueClass: chamadasTotal > 0 ? 'text-primary' : 'text-grey-6',
           colClass: 'col-12 col-md-4',
+          comparacao: null,
         },
       ]
     })
@@ -1382,12 +1654,16 @@ export default {
       angariadorOptions.value = []
     }
 
-    function buildQueryParams() {
-      const base = {
+    function buildQueryParamsBase() {
+      return {
         periodo: periodo.value,
         q: angariadorSeleccionado.value ? undefined : (q.value || undefined),
         angariador_id: angariadorSeleccionado.value?.id || undefined,
       }
+    }
+
+    function buildQueryParams() {
+      const base = buildQueryParamsBase()
       if (periodo.value === 'mes') {
         return { ...base, mes: mes.value, ano: ano.value }
       }
@@ -1402,6 +1678,36 @@ export default {
         ...base,
         semana: getISOWeek(d),
         ano: getISOWeekYear(d),
+        data_inicio: format(inicio, 'yyyy-MM-dd'),
+        data_fim: format(fim, 'yyyy-MM-dd'),
+      }
+    }
+
+    function buildQueryParamsAnterior() {
+      const base = buildQueryParamsBase()
+      if (periodo.value === 'mes') {
+        let m = mes.value - 1
+        let y = ano.value
+        if (m < 1) {
+          m = 12
+          y -= 1
+        }
+        return { ...base, mes: m, ano: y }
+      }
+      if (periodo.value === 'dia') {
+        const d = fromYMD(dataDiaPicker.value)
+        if (Number.isNaN(d.getTime())) return { ...base, data: dataDiaPicker.value }
+        return { ...base, data: format(subDays(d, 1), 'yyyy-MM-dd') }
+      }
+      const d = fromYMD(dataSemanaPicker.value)
+      if (Number.isNaN(d.getTime())) return base
+      const prev = subDays(d, 7)
+      const inicio = startOfISOWeek(prev)
+      const fim = endOfISOWeek(prev)
+      return {
+        ...base,
+        semana: getISOWeek(prev),
+        ano: getISOWeekYear(prev),
         data_inicio: format(inicio, 'yyyy-MM-dd'),
         data_fim: format(fim, 'yyyy-MM-dd'),
       }
@@ -1427,9 +1733,15 @@ export default {
       loading.value = true
       resultadoStatsOk.value = false
       try {
-        const resp = await api.get('/angariadores/admin/stats/', {
-          params: buildQueryParams(),
-        })
+        const requests = [
+          api.get('/angariadores/admin/stats/', { params: buildQueryParams() }),
+        ]
+        if (compararPeriodo.value) {
+          requests.push(
+            api.get('/angariadores/admin/stats/', { params: buildQueryParamsAnterior() })
+          )
+        }
+        const [resp, respAnt] = await Promise.all(requests)
         const body = resp.data || {}
         resumo.value = body.resumo || {}
         const tp = body.totais_plataforma || body.totaisPlataforma || {}
@@ -1453,10 +1765,21 @@ export default {
           body.metas_pacotes || body.metasPacotes,
           sorted
         )
+        if (compararPeriodo.value && respAnt) {
+          const bodyAnt = respAnt.data || {}
+          resumoAnterior.value = bodyAnt.resumo || {}
+          resultadosAnterior.value = deduplicarResultados(bodyAnt.resultados || [])
+          comparacaoCarregada.value = true
+        } else {
+          comparacaoCarregada.value = false
+          resumoAnterior.value = null
+          resultadosAnterior.value = []
+        }
         await carregarChamadasRegistadas()
         mesNome.value = body.mes_nome || ''
         resultadoStatsOk.value = true
       } catch (err) {
+        comparacaoCarregada.value = false
         $q.notify({
           type: 'negative',
           message: err.response?.data?.error || 'Erro ao carregar estatísticas de angariadores',
@@ -1545,10 +1868,20 @@ export default {
       carregar()
     })
 
+    watch([mes, ano, dataDiaPicker, dataSemanaPicker], () => {
+      if (!loading.value) carregar()
+    })
+
     onMounted(carregar)
 
     return {
       periodo,
+      compararPeriodo,
+      tituloPeriodoAnterior,
+      comparacaoDisponivel,
+      comparativoResumoBlocos,
+      resultadosComparacao,
+      variacaoAngariador,
       mes,
       ano,
       dataDiaPicker,
@@ -1638,6 +1971,32 @@ export default {
   top: 72px;
   z-index: 20;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.stats-compare-card {
+  border-left: 4px solid var(--q-primary);
+}
+
+.stats-compare-metric {
+  padding: 12px 14px;
+  background: #fafafa;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  height: 100%;
+}
+
+.stats-compare-table {
+  th {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #616161;
+  }
+  td {
+    vertical-align: top;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
 }
 
 .stats-alert-banner {
