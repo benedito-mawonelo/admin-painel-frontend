@@ -1828,19 +1828,38 @@ export default {
       return 'angariadores-stats.csv'
     }
 
+    function mensagemErroStats(err, fallback) {
+      const data = err?.response?.data
+      if (typeof data === 'string' && data.trim()) return data
+      if (data?.error) return String(data.error)
+      if (data?.detail) return String(data.detail)
+      const status = err?.response?.status
+      if (status) return `${fallback} (HTTP ${status})`
+      if (err?.message) return `${fallback}: ${err.message}`
+      return fallback
+    }
+
     const carregar = async () => {
       loading.value = true
       resultadoStatsOk.value = false
       try {
-        const requests = [
-          api.get('/angariadores/admin/stats/', { params: buildQueryParams() }),
-        ]
+        const resp = await api.get('/angariadores/admin/stats/', { params: buildQueryParams() })
+        let respAnt = null
         if (compararPeriodo.value) {
-          requests.push(
-            api.get('/angariadores/admin/stats/', { params: buildQueryParamsAnterior() })
-          )
+          try {
+            respAnt = await api.get('/angariadores/admin/stats/', {
+              params: buildQueryParamsAnterior(),
+            })
+          } catch (errCmp) {
+            comparacaoCarregada.value = false
+            resumoAnterior.value = null
+            resultadosAnterior.value = []
+            $q.notify({
+              type: 'warning',
+              message: mensagemErroStats(errCmp, 'Período de comparação indisponível'),
+            })
+          }
         }
-        const [resp, respAnt] = await Promise.all(requests)
         const body = resp.data || {}
         resumo.value = body.resumo || {}
         const tp = body.totais_plataforma || body.totaisPlataforma || {}
@@ -1869,7 +1888,7 @@ export default {
           resumoAnterior.value = bodyAnt.resumo || {}
           resultadosAnterior.value = deduplicarResultados(bodyAnt.resultados || [])
           comparacaoCarregada.value = true
-        } else {
+        } else if (!compararPeriodo.value) {
           comparacaoCarregada.value = false
           resumoAnterior.value = null
           resultadosAnterior.value = []
@@ -1881,7 +1900,7 @@ export default {
         comparacaoCarregada.value = false
         $q.notify({
           type: 'negative',
-          message: err.response?.data?.error || 'Erro ao carregar estatísticas de angariadores',
+          message: mensagemErroStats(err, 'Erro ao carregar estatísticas de angariadores'),
         })
       } finally {
         loading.value = false
