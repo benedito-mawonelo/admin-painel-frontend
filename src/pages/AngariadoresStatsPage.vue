@@ -455,18 +455,30 @@
           Indicadores de conformidade do período
         </div>
         <div class="text-caption text-grey-7 q-mb-md">
-          Totais globais da consulta actual
+          Operacional (pagamentos e desbloqueios reais) — separado dos convertidos com pontos
         </div>
         <div class="row q-col-gutter-md">
-          <div class="col-12 col-md-6">
-            <div class="text-caption text-grey-7">Convertidos fora dos 15 min</div>
+          <div class="col-12 col-md-4">
+            <div class="text-caption text-grey-7">Pagamentos angariados fora da janela (sem pontos)</div>
             <div class="text-h5 text-weight-bold text-warning q-mt-xs">
-              {{ resumo.total_convertidos_fora_15m ?? 0 }}
+              {{ resumo.total_pagamentos_fora_15m ?? 0 }}
+            </div>
+            <div class="text-caption text-grey-6 q-mt-xs">
+              Com pontos atribuídos: {{ resumo.total_convertidos_fora_15m ?? 0 }}
             </div>
           </div>
-          <div class="col-12 col-md-6">
-            <div class="text-caption text-grey-7">Planos desbloqueados no painel</div>
+          <div class="col-12 col-md-4">
+            <div class="text-caption text-grey-7">Desbloqueios manuais no painel (ADMIN)</div>
             <div class="text-h5 text-weight-bold text-info q-mt-xs">
+              {{ resumo.total_desbloqueios_painel ?? 0 }}
+            </div>
+            <div class="text-caption text-grey-6 q-mt-xs">
+              Clientes angariados: {{ resumo.total_desbloqueios_painel_angariados ?? 0 }}
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="text-caption text-grey-7">Convertidos via painel (com pontos)</div>
+            <div class="text-h5 text-weight-bold text-grey-8 q-mt-xs">
               {{ resumo.total_convertidos_via_painel ?? 0 }}
             </div>
           </div>
@@ -568,16 +580,20 @@
                 <strong>{{ row.pending_expirados }}</strong>
               </div>
               <div class="stats-metric-row">
-                <span>Convertidos fora 15 min</span>
-                <strong :class="(row.convertidos_fora_15m || 0) > 0 ? 'text-warning' : ''">
-                  {{ row.convertidos_fora_15m ?? 0 }}
+                <span>Pagamentos fora 15 min (sem pontos)</span>
+                <strong :class="(row.pagamentos_fora_15m || 0) > 0 ? 'text-warning' : ''">
+                  {{ row.pagamentos_fora_15m ?? 0 }}
                 </strong>
               </div>
               <div class="stats-metric-row">
-                <span>Planos desbloqueados no painel</span>
-                <strong :class="(row.convertidos_via_painel || 0) > 0 ? 'text-info' : ''">
-                  {{ row.convertidos_via_painel ?? 0 }}
+                <span>Desbloqueios painel (ADMIN)</span>
+                <strong :class="(row.desbloqueios_painel || 0) > 0 ? 'text-info' : ''">
+                  {{ row.desbloqueios_painel ?? 0 }}
                 </strong>
+              </div>
+              <div class="stats-metric-row">
+                <span>Convertidos via painel (com pontos)</span>
+                <strong>{{ row.convertidos_via_painel ?? 0 }}</strong>
               </div>
             </div>
 
@@ -1895,6 +1911,8 @@ export default {
         'pending_expirados',
         'convertidos_fora_15m',
         'convertidos_via_painel',
+        'pagamentos_fora_15m',
+        'desbloqueios_painel',
         'total_pontos',
         'taxa_conversao',
       ]
@@ -1908,6 +1926,9 @@ export default {
       lines.push(['pending_activos', resumo.value.pending_activos || 0].map(csvEscape).join(','))
       lines.push(['pending_expirados', resumo.value.pending_expirados || 0].map(csvEscape).join(','))
       lines.push(['taxa_conversao_global', resumo.value.taxa_conversao_global || 0].map(csvEscape).join(','))
+      lines.push(['total_pagamentos_fora_15m', resumo.value.total_pagamentos_fora_15m || 0].map(csvEscape).join(','))
+      lines.push(['total_desbloqueios_painel', resumo.value.total_desbloqueios_painel || 0].map(csvEscape).join(','))
+      lines.push(['total_desbloqueios_painel_angariados', resumo.value.total_desbloqueios_painel_angariados || 0].map(csvEscape).join(','))
       lines.push('')
       lines.push(header.map(csvEscape).join(','))
 
@@ -1927,6 +1948,8 @@ export default {
             row.pending_expirados,
             row.convertidos_fora_15m ?? 0,
             row.convertidos_via_painel ?? 0,
+            row.pagamentos_fora_15m ?? 0,
+            row.desbloqueios_painel ?? 0,
             row.total_pontos,
             row.taxa_conversao,
           ]
