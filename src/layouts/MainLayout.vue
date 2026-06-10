@@ -168,6 +168,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/chat-moderacao" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="forum" color="purple-3" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Chat do ranking</div>
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/pagamentos-falhados" class="text-white">
             <q-item-section avatar>
               <q-icon name="report_problem" color="red-4" />

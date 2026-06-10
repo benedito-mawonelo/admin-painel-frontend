@@ -24,7 +24,8 @@ const routes = [
       { path: 'pagamentos-falhados', component: () => import('src/pages/FailedPaymentsPage.vue') },
       { path: 'reembolsos', component: () => import('src/pages/RefundsPage.vue') },
       { path: 'users-firebase', component: () => import('src/pages/FirebaseUsersPage.vue') },
-      { path: 'angariadores-stats', component: () => import('src/pages/AngariadoresStatsPage.vue') }
+      { path: 'angariadores-stats', component: () => import('src/pages/AngariadoresStatsPage.vue') },
+      { path: 'chat-moderacao', component: () => import('src/pages/ChatModerationPage.vue') },
     ],
     meta: { requiresAuth: true }
   },
