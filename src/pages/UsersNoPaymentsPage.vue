@@ -515,10 +515,61 @@
 
               <!-- Secção 6: Pagamento e origem -->
               <div class="form-section">
-                <div class="form-section-title">
-                  <q-icon name="payments" size="sm" class="q-mr-xs" />
-                  Pagamento e origem
+                <div class="form-section-title row items-center">
+                  <span class="col">
+                    <q-icon name="payments" size="sm" class="q-mr-xs" />
+                    Pagamento e origem
+                  </span>
+                  <q-btn
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="search"
+                    label="Buscar pagamento"
+                    :loading="pagamentoBuscaLoading"
+                    :disable="!selectedAtendimentoUser?.telefone"
+                    @click="buscarPagamentoParaAtendimento('create')"
+                  />
                 </div>
+
+                <q-banner
+                  v-if="pagamentoBuscaFeita && pagamentosEncontrados.length"
+                  dense
+                  rounded
+                  class="bg-green-1 text-dark q-mb-md"
+                >
+                  <template v-slot:avatar>
+                    <q-icon name="check_circle" color="positive" />
+                  </template>
+                  {{ pagamentosEncontrados.length }} pagamento(s) encontrado(s) no gateway (M-Pesa / E-Mola).
+                  O número foi preenchido automaticamente.
+                </q-banner>
+                <q-banner
+                  v-else-if="pagamentoBuscaFeita && !pagamentoBuscaLoading"
+                  dense
+                  rounded
+                  class="bg-grey-2 text-dark q-mb-md"
+                >
+                  <template v-slot:avatar>
+                    <q-icon name="info" color="grey-7" />
+                  </template>
+                  Nenhum pagamento encontrado para o telefone de cadastro. Pode preencher manualmente ou tentar outro número.
+                </q-banner>
+
+                <q-select
+                  v-if="pagamentosEncontrados.length > 1"
+                  v-model="pagamentoSelecionadoKey"
+                  :options="pagamentosEncontradosOptions"
+                  label="Seleccionar pagamento encontrado"
+                  outlined
+                  dense
+                  emit-value
+                  map-options
+                  class="bg-white q-mb-md"
+                  @update:model-value="onPagamentoSelecionadoChange('create')"
+                />
+
                 <div class="row q-col-gutter-md">
                   <div class="col-12 col-sm-6">
                     <q-input
@@ -530,6 +581,7 @@
                       unmasked-value
                       clearable
                       class="bg-white"
+                      hint="Preenchido automaticamente se existir pagamento no gateway"
                     >
                       <template v-slot:prepend>
                         <q-icon name="phone" />
@@ -710,10 +762,49 @@
               </div>
 
               <div class="form-section form-section-highlight">
-                <div class="form-section-title">
-                  <q-icon name="payments" size="sm" class="q-mr-xs" />
-                  Pagamento e origem
+                <div class="form-section-title row items-center">
+                  <span class="col">
+                    <q-icon name="payments" size="sm" class="q-mr-xs" />
+                    Pagamento e origem
+                  </span>
+                  <q-btn
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="search"
+                    label="Buscar pagamento"
+                    :loading="pagamentoBuscaEditLoading"
+                    :disable="!editAtendimentoMeta?.target_user_telefone"
+                    @click="buscarPagamentoParaAtendimento('edit')"
+                  />
                 </div>
+
+                <q-banner
+                  v-if="pagamentoBuscaEditFeita && pagamentosEncontradosEdit.length"
+                  dense
+                  rounded
+                  class="bg-green-1 text-dark q-mb-md"
+                >
+                  <template v-slot:avatar>
+                    <q-icon name="check_circle" color="positive" />
+                  </template>
+                  Pagamento encontrado no gateway — número actualizado.
+                </q-banner>
+
+                <q-select
+                  v-if="pagamentosEncontradosEdit.length > 1"
+                  v-model="pagamentoSelecionadoEditKey"
+                  :options="pagamentosEncontradosEditOptions"
+                  label="Seleccionar pagamento"
+                  outlined
+                  dense
+                  emit-value
+                  map-options
+                  class="bg-white q-mb-md"
+                  @update:model-value="onPagamentoSelecionadoChange('edit')"
+                />
+
                 <div class="row q-col-gutter-md">
                   <div class="col-12 col-sm-6">
                     <q-input
@@ -920,6 +1011,30 @@ function userDisplayName(u) {
   return [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.username || '—'
 }
 
+function normalizePhoneDigits(phone) {
+  return String(phone || '').replace(/\D/g, '').slice(-9)
+}
+
+function paymentOptionKey(p, index) {
+  return `${p.method || 'pay'}-${index}-${p.phone_number || ''}-${p.payment_date || ''}`
+}
+
+function formatPaymentLabel(p) {
+  const method = String(p.method || '').toUpperCase()
+  const amount = p.amount != null
+    ? new Intl.NumberFormat('pt-MZ', { style: 'currency', currency: 'MZN' }).format(p.amount)
+    : '—'
+  const dateRaw = p.payment_date
+  let dateStr = '—'
+  if (dateRaw) {
+    const d = new Date(dateRaw)
+    dateStr = Number.isNaN(d.getTime())
+      ? String(dateRaw)
+      : d.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+  return `${method} · ${p.phone_number || '—'} · ${amount} · ${dateStr}`
+}
+
 function splitContactadoEm(iso) {
   if (!iso) return { date: '', hour: '' }
   const d = new Date(iso)
@@ -980,6 +1095,18 @@ export default {
     const userSearchOptions = ref([])
     const userSearchLoading = ref(false)
     const selectedAtendimentoUser = ref(null)
+
+    const pagamentoBuscaLoading = ref(false)
+    const pagamentoBuscaFeita = ref(false)
+    const pagamentosEncontrados = ref([])
+    const pagamentosEncontradosOptions = ref([])
+    const pagamentoSelecionadoKey = ref(null)
+
+    const pagamentoBuscaEditLoading = ref(false)
+    const pagamentoBuscaEditFeita = ref(false)
+    const pagamentosEncontradosEdit = ref([])
+    const pagamentosEncontradosEditOptions = ref([])
+    const pagamentoSelecionadoEditKey = ref(null)
 
     const loadingAtendimentos = ref(false)
     const atendimentosRows = ref([])
@@ -1165,9 +1292,148 @@ export default {
       }
     }
 
+    function resetPagamentoBuscaCreate() {
+      pagamentoBuscaLoading.value = false
+      pagamentoBuscaFeita.value = false
+      pagamentosEncontrados.value = []
+      pagamentosEncontradosOptions.value = []
+      pagamentoSelecionadoKey.value = null
+    }
+
+    function resetPagamentoBuscaEdit() {
+      pagamentoBuscaEditLoading.value = false
+      pagamentoBuscaEditFeita.value = false
+      pagamentosEncontradosEdit.value = []
+      pagamentosEncontradosEditOptions.value = []
+      pagamentoSelecionadoEditKey.value = null
+    }
+
+    function applyPagamentoAoFormulario(payment, form, cadastroTelefone) {
+      if (!payment) return
+      const payPhone = String(payment.phone_number || '').replace(/\D/g, '')
+      form.numero_pagamento = payPhone
+      const payNorm = normalizePhoneDigits(payment.phone_number)
+      const cadNorm = normalizePhoneDigits(cadastroTelefone)
+      if (payNorm && cadNorm) {
+        form.mesmo_celular_app = payNorm === cadNorm ? 'sim' : 'nao'
+      }
+    }
+
+    function setPagamentosResultado(payments, mode) {
+      const list = Array.isArray(payments) ? payments : []
+      const options = list.map((p, index) => ({
+        label: formatPaymentLabel(p),
+        value: paymentOptionKey(p, index),
+        payment: p,
+      }))
+
+      if (mode === 'edit') {
+        pagamentosEncontradosEdit.value = list
+        pagamentosEncontradosEditOptions.value = options
+        pagamentoBuscaEditFeita.value = true
+        if (options.length) {
+          pagamentoSelecionadoEditKey.value = options[0].value
+          applyPagamentoAoFormulario(
+            options[0].payment,
+            formEditAtendimento.value,
+            editAtendimentoMeta.value?.target_user_telefone
+          )
+        }
+        return
+      }
+
+      pagamentosEncontrados.value = list
+      pagamentosEncontradosOptions.value = options
+      pagamentoBuscaFeita.value = true
+      if (options.length) {
+        pagamentoSelecionadoKey.value = options[0].value
+        applyPagamentoAoFormulario(
+          options[0].payment,
+          formAtendimento.value,
+          selectedAtendimentoUser.value?.telefone
+        )
+      }
+    }
+
+    function onPagamentoSelecionadoChange(mode) {
+      if (mode === 'edit') {
+        const opt = pagamentosEncontradosEditOptions.value.find((o) => o.value === pagamentoSelecionadoEditKey.value)
+        applyPagamentoAoFormulario(
+          opt?.payment,
+          formEditAtendimento.value,
+          editAtendimentoMeta.value?.target_user_telefone
+        )
+        return
+      }
+      const opt = pagamentosEncontradosOptions.value.find((o) => o.value === pagamentoSelecionadoKey.value)
+      applyPagamentoAoFormulario(
+        opt?.payment,
+        formAtendimento.value,
+        selectedAtendimentoUser.value?.telefone
+      )
+    }
+
+    async function buscarPagamentoParaAtendimento(mode = 'create') {
+      const telefone =
+        mode === 'edit'
+          ? editAtendimentoMeta.value?.target_user_telefone
+          : selectedAtendimentoUser.value?.telefone
+
+      if (!telefone) {
+        $q.notify({ type: 'warning', message: 'Seleccione um utilizador com telefone de cadastro.' })
+        return
+      }
+
+      if (mode === 'edit') {
+        pagamentoBuscaEditLoading.value = true
+      } else {
+        pagamentoBuscaLoading.value = true
+      }
+
+      try {
+        const { data } = await api.get('/payments/admin/external-with-claims/', {
+          params: { phone: telefone },
+        })
+        const payments = data?.payments || []
+        setPagamentosResultado(payments, mode)
+
+        if (!payments.length) {
+          $q.notify({
+            type: 'info',
+            message: 'Nenhum pagamento encontrado no gateway para este número.',
+          })
+        } else {
+          $q.notify({
+            type: 'positive',
+            message: `Pagamento encontrado — nº ${payments[0].phone_number || telefone} preenchido.`,
+          })
+        }
+      } catch (err) {
+        console.error('Erro ao buscar pagamento:', err)
+        if (mode === 'edit') {
+          pagamentoBuscaEditFeita.value = true
+          pagamentosEncontradosEdit.value = []
+        } else {
+          pagamentoBuscaFeita.value = true
+          pagamentosEncontrados.value = []
+        }
+        $q.notify({
+          type: 'negative',
+          message: parseApiError(err, 'Erro ao buscar pagamento no gateway'),
+        })
+      } finally {
+        if (mode === 'edit') {
+          pagamentoBuscaEditLoading.value = false
+        } else {
+          pagamentoBuscaLoading.value = false
+        }
+      }
+    }
+
     function openRegistarAtendimento() {
       formAtendimento.value = defaultFormAtendimento()
       selectedAtendimentoUser.value = null
+      resetPagamentoBuscaCreate()
       userSearchOptions.value = rows.value.slice(0, 20).map(mapUserToOption)
       dialogRegistarAtendimento.value = true
     }
@@ -1176,11 +1442,16 @@ export default {
       dialogRegistarAtendimento.value = false
       formAtendimento.value = defaultFormAtendimento()
       selectedAtendimentoUser.value = null
+      resetPagamentoBuscaCreate()
     }
 
     function onAtendimentoUserSelected(userId) {
       const opt = userSearchOptions.value.find((o) => o.value === userId)
       selectedAtendimentoUser.value = opt?.user || null
+      resetPagamentoBuscaCreate()
+      if (selectedAtendimentoUser.value?.telefone) {
+        buscarPagamentoParaAtendimento('create')
+      }
     }
 
     async function filterUsersForAtendimento(val, update) {
@@ -1289,7 +1560,11 @@ export default {
       editAtendimentoId.value = row.id
       editAtendimentoMeta.value = row
       formEditAtendimento.value = formFromAtendimentoRow(row)
+      resetPagamentoBuscaEdit()
       dialogEditarAtendimento.value = true
+      if (!row.numero_pagamento && row.target_user_telefone) {
+        buscarPagamentoParaAtendimento('edit')
+      }
     }
 
     function openEditarAtendimentoFromDetalhe() {
@@ -1302,6 +1577,7 @@ export default {
       dialogEditarAtendimento.value = false
       editAtendimentoId.value = null
       editAtendimentoMeta.value = null
+      resetPagamentoBuscaEdit()
     }
 
     async function guardarEdicaoAtendimento() {
@@ -1433,6 +1709,18 @@ export default {
       userSearchOptions,
       userSearchLoading,
       selectedAtendimentoUser,
+      pagamentoBuscaLoading,
+      pagamentoBuscaFeita,
+      pagamentosEncontrados,
+      pagamentosEncontradosOptions,
+      pagamentoSelecionadoKey,
+      pagamentoBuscaEditLoading,
+      pagamentoBuscaEditFeita,
+      pagamentosEncontradosEdit,
+      pagamentosEncontradosEditOptions,
+      pagamentoSelecionadoEditKey,
+      buscarPagamentoParaAtendimento,
+      onPagamentoSelecionadoChange,
       feedbackOptions,
       personaOptions,
       personaSubtipoInatroOptions,
