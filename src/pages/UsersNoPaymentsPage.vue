@@ -268,6 +268,9 @@
               <q-btn flat dense icon="visibility" color="primary" size="sm" @click="openDetalheAtendimento(props.row)">
                 <q-tooltip>Ver detalhe</q-tooltip>
               </q-btn>
+              <q-btn flat dense icon="edit" color="secondary" size="sm" @click="openEditarAtendimento(props.row)">
+                <q-tooltip>Editar registo</q-tooltip>
+              </q-btn>
             </q-td>
           </template>
           <template v-slot:no-data>
@@ -618,7 +621,213 @@
           </div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="Fechar" color="primary" v-close-popup />
+          <q-btn flat label="Fechar" color="grey" v-close-popup />
+          <q-btn
+            unelevated
+            label="Editar registo"
+            color="primary"
+            icon="edit"
+            no-caps
+            @click="openEditarAtendimentoFromDetalhe"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <!-- Dialog: editar atendimento -->
+    <q-dialog v-model="dialogEditarAtendimento" persistent>
+      <q-card class="atendimento-dialog-card">
+        <q-card-section class="atendimento-dialog-header row items-center no-wrap">
+          <q-icon name="edit_note" size="md" class="q-mr-sm" />
+          <div class="col">
+            <div class="text-h6 text-weight-bold">Editar atendimento</div>
+            <div class="text-caption text-white" style="opacity: 0.9">
+              Actualize quando o cliente ligar (ex.: nº de pagamento e origem)
+            </div>
+          </div>
+          <q-btn flat round dense icon="close" color="white" @click="closeEditarAtendimento" />
+        </q-card-section>
+
+        <q-card-section class="atendimento-dialog-body q-pa-none">
+          <q-scroll-area class="atendimento-scroll-area">
+            <div class="q-pa-lg q-gutter-lg">
+              <q-banner dense rounded class="bg-amber-1 text-dark">
+                <template v-slot:avatar>
+                  <q-icon name="info" color="amber-9" />
+                </template>
+                Use esta edição quando o utilizador disse que ia ligar noutra hora — registe aqui o
+                <strong>número de pagamento</strong>, a <strong>origem (como soube)</strong> e actualize o feedback se necessário.
+              </q-banner>
+
+              <q-card v-if="editAtendimentoMeta" flat bordered class="user-preview-card">
+                <q-card-section class="row items-center q-py-sm">
+                  <q-avatar color="primary" text-color="white" icon="person" class="q-mr-md" />
+                  <div class="col">
+                    <div class="text-weight-bold">{{ editAtendimentoMeta.target_user_name }}</div>
+                    <div class="text-caption text-grey-7">
+                      Cadastro: {{ editAtendimentoMeta.target_user_telefone || '—' }}
+                      · Registado por: {{ editAtendimentoMeta.staff_name }}
+                    </div>
+                  </div>
+                </q-card-section>
+              </q-card>
+
+              <div class="form-section">
+                <div class="form-section-title">
+                  <q-icon name="event" size="sm" class="q-mr-xs" />
+                  Data do contacto
+                </div>
+                <div class="row q-col-gutter-md">
+                  <div class="col-12 col-sm-6">
+                    <q-input v-model="formEditAtendimento.contactado_em" label="Data *" type="date" outlined dense class="bg-white" />
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <q-input v-model="formEditAtendimento.contactado_hora" label="Hora (opcional)" type="time" outlined dense class="bg-white" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="form-section-title">
+                  <q-icon name="forum" size="sm" class="q-mr-xs" />
+                  Feedback *
+                </div>
+                <div class="feedback-grid">
+                  <q-btn
+                    v-for="opt in feedbackOptions"
+                    :key="'edit-' + opt.value"
+                    :outline="formEditAtendimento.feedback !== opt.value"
+                    :unelevated="formEditAtendimento.feedback === opt.value"
+                    :color="formEditAtendimento.feedback === opt.value ? 'primary' : 'grey-7'"
+                    :text-color="formEditAtendimento.feedback === opt.value ? 'white' : undefined"
+                    no-caps
+                    class="feedback-chip"
+                    @click="formEditAtendimento.feedback = opt.value"
+                  >
+                    {{ opt.label }}
+                  </q-btn>
+                </div>
+              </div>
+
+              <div class="form-section form-section-highlight">
+                <div class="form-section-title">
+                  <q-icon name="payments" size="sm" class="q-mr-xs" />
+                  Pagamento e origem
+                </div>
+                <div class="row q-col-gutter-md">
+                  <div class="col-12 col-sm-6">
+                    <q-input
+                      v-model="formEditAtendimento.numero_pagamento"
+                      label="Número de pagamento"
+                      outlined
+                      dense
+                      mask="###########"
+                      unmasked-value
+                      clearable
+                      class="bg-white"
+                    >
+                      <template v-slot:prepend>
+                        <q-icon name="phone" />
+                      </template>
+                    </q-input>
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <q-input
+                      v-model="formEditAtendimento.como_soube"
+                      label="Como soube (origem)"
+                      outlined
+                      dense
+                      clearable
+                      class="bg-white"
+                    >
+                      <template v-slot:prepend>
+                        <q-icon name="campaign" />
+                      </template>
+                    </q-input>
+                  </div>
+                </div>
+                <q-select
+                  v-model="formEditAtendimento.mesmo_celular_app"
+                  :options="mesmoCelularOptions"
+                  label="Nº de pagamento no mesmo celular da app?"
+                  outlined
+                  dense
+                  emit-value
+                  map-options
+                  clearable
+                  class="bg-white q-mt-md"
+                />
+              </div>
+
+              <div class="form-section">
+                <div class="form-section-title">
+                  <q-icon name="psychology" size="sm" class="q-mr-xs" />
+                  Persona
+                </div>
+                <q-select
+                  v-model="formEditAtendimento.persona"
+                  :options="personaOptions"
+                  label="Tipo de utilizador *"
+                  outlined
+                  dense
+                  emit-value
+                  map-options
+                  class="bg-white"
+                />
+                <div v-if="formEditAtendimento.persona === 'prep_exame_inatro'" class="subtipo-box q-mt-md">
+                  <q-btn-toggle
+                    v-model="formEditAtendimento.persona_subtipo"
+                    spread
+                    no-caps
+                    toggle-color="primary"
+                    :options="personaSubtipoInatroOptions"
+                    class="full-width"
+                  />
+                </div>
+                <div v-else-if="formEditAtendimento.persona === 'iniciante'" class="subtipo-box q-mt-md">
+                  <q-btn-toggle
+                    v-model="formEditAtendimento.persona_subtipo"
+                    spread
+                    no-caps
+                    toggle-color="primary"
+                    :options="personaSubtipoInicianteOptions"
+                    class="full-width"
+                  />
+                </div>
+              </div>
+
+              <div class="form-section form-section-last">
+                <div class="form-section-title">
+                  <q-icon name="notes" size="sm" class="q-mr-xs" />
+                  Observações
+                </div>
+                <q-input
+                  v-model="formEditAtendimento.observacoes"
+                  type="textarea"
+                  outlined
+                  dense
+                  autogrow
+                  class="bg-white"
+                  placeholder="Ex.: Cliente ligou às 15h conforme combinado..."
+                />
+              </div>
+            </div>
+          </q-scroll-area>
+        </q-card-section>
+
+        <q-separator />
+        <q-card-actions class="atendimento-dialog-actions q-pa-md">
+          <q-btn flat label="Cancelar" color="grey-8" no-caps @click="closeEditarAtendimento" />
+          <q-space />
+          <q-btn
+            unelevated
+            label="Guardar alterações"
+            color="primary"
+            icon="save"
+            no-caps
+            :loading="savingEditAtendimento"
+            @click="guardarEdicaoAtendimento"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -711,6 +920,38 @@ function userDisplayName(u) {
   return [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.username || '—'
 }
 
+function splitContactadoEm(iso) {
+  if (!iso) return { date: '', hour: '' }
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) {
+    const parts = String(iso).split('T')
+    return { date: parts[0] || '', hour: (parts[1] || '').slice(0, 5) }
+  }
+  const pad = (n) => String(n).padStart(2, '0')
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    hour: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  }
+}
+
+function formFromAtendimentoRow(row) {
+  const { date, hour } = splitContactadoEm(row.contactado_em)
+  return {
+    contactado_em: date,
+    contactado_hora: hour,
+    feedback: row.feedback || '',
+    persona: row.persona || '',
+    persona_subtipo: row.persona_subtipo || '',
+    numero_pagamento: row.numero_pagamento || '',
+    nova_versao: !!row.nova_versao,
+    usa_android: !!row.usa_android,
+    usa_iphone: !!row.usa_iphone,
+    mesmo_celular_app: row.mesmo_celular_app || '',
+    como_soube: row.como_soube || '',
+    observacoes: row.observacoes || '',
+  }
+}
+
 export default {
   name: 'UsersNoPaymentsPage',
 
@@ -751,6 +992,12 @@ export default {
 
     const dialogDetalheAtendimento = ref(false)
     const atendimentoDetalhe = ref(null)
+
+    const dialogEditarAtendimento = ref(false)
+    const editAtendimentoId = ref(null)
+    const editAtendimentoMeta = ref(null)
+    const formEditAtendimento = ref(formFromAtendimentoRow({}))
+    const savingEditAtendimento = ref(false)
 
     let refreshTimer = null
 
@@ -962,12 +1209,24 @@ export default {
       }
     }
 
-    function buildContactadoEm() {
-      const d = formAtendimento.value.contactado_em
-      const h = formAtendimento.value.contactado_hora
+    function buildContactadoEmFromForm(form) {
+      const d = form.contactado_em
+      const h = form.contactado_hora
       if (!d) return null
       if (h) return `${d}T${h}:00`
       return d
+    }
+
+    function parseApiError(err, fallback) {
+      const data = err?.response?.data
+      if (typeof data === 'string' && data.trim()) return data
+      if (data?.error) return data.error
+      if (data?.detail) return data.detail
+      if (data && typeof data === 'object') {
+        const first = Object.values(data).flat()[0]
+        if (first) return String(first)
+      }
+      return fallback
     }
 
     async function guardarAtendimento() {
@@ -993,7 +1252,7 @@ export default {
         return
       }
 
-      const contactado_em = buildContactadoEm()
+      const contactado_em = buildContactadoEmFromForm(formAtendimento.value)
       if (!contactado_em) {
         $q.notify({ type: 'warning', message: 'Indique a data do contacto.' })
         return
@@ -1020,18 +1279,86 @@ export default {
           await loadAtendimentos()
         }
       } catch (err) {
-        const data = err.response?.data
-        let msg = 'Erro ao guardar atendimento'
-        if (typeof data === 'string') msg = data
-        else if (data?.error) msg = data.error
-        else if (data?.detail) msg = data.detail
-        else if (data && typeof data === 'object') {
-          const first = Object.values(data).flat()[0]
-          if (first) msg = String(first)
-        }
-        $q.notify({ type: 'negative', message: msg })
+        $q.notify({ type: 'negative', message: parseApiError(err, 'Erro ao guardar atendimento') })
       } finally {
         savingAtendimento.value = false
+      }
+    }
+
+    function openEditarAtendimento(row) {
+      editAtendimentoId.value = row.id
+      editAtendimentoMeta.value = row
+      formEditAtendimento.value = formFromAtendimentoRow(row)
+      dialogEditarAtendimento.value = true
+    }
+
+    function openEditarAtendimentoFromDetalhe() {
+      if (!atendimentoDetalhe.value) return
+      dialogDetalheAtendimento.value = false
+      openEditarAtendimento(atendimentoDetalhe.value)
+    }
+
+    function closeEditarAtendimento() {
+      dialogEditarAtendimento.value = false
+      editAtendimentoId.value = null
+      editAtendimentoMeta.value = null
+    }
+
+    async function guardarEdicaoAtendimento() {
+      const id = editAtendimentoId.value
+      if (!id) return
+
+      if (!formEditAtendimento.value.feedback) {
+        $q.notify({ type: 'warning', message: 'Seleccione o feedback.' })
+        return
+      }
+      if (!formEditAtendimento.value.persona) {
+        $q.notify({ type: 'warning', message: 'Seleccione a persona.' })
+        return
+      }
+      if (formEditAtendimento.value.persona === 'prep_exame_inatro' && !formEditAtendimento.value.persona_subtipo) {
+        $q.notify({ type: 'warning', message: 'Seleccione se tem data marcada (INATRO).' })
+        return
+      }
+      if (formEditAtendimento.value.persona === 'iniciante' && !formEditAtendimento.value.persona_subtipo) {
+        $q.notify({ type: 'warning', message: 'Seleccione com tempo ou sem tempo (Iniciante).' })
+        return
+      }
+
+      const contactado_em = buildContactadoEmFromForm(formEditAtendimento.value)
+      if (!contactado_em) {
+        $q.notify({ type: 'warning', message: 'Indique a data do contacto.' })
+        return
+      }
+
+      savingEditAtendimento.value = true
+      try {
+        const f = formEditAtendimento.value
+        const { data } = await api.patch(`/atendimentos/${id}/`, {
+          contactado_em,
+          feedback: f.feedback,
+          persona: f.persona,
+          persona_subtipo: f.persona_subtipo || '',
+          numero_pagamento: f.numero_pagamento || '',
+          nova_versao: f.nova_versao,
+          usa_android: f.usa_android,
+          usa_iphone: f.usa_iphone,
+          mesmo_celular_app: f.mesmo_celular_app || '',
+          como_soube: f.como_soube || '',
+          observacoes: f.observacoes || '',
+        })
+        $q.notify({ type: 'positive', message: 'Atendimento actualizado.' })
+        closeEditarAtendimento()
+        if (viewMode.value === 'registos') {
+          await loadAtendimentos()
+        }
+        if (atendimentoDetalhe.value?.id === id) {
+          atendimentoDetalhe.value = data
+        }
+      } catch (err) {
+        $q.notify({ type: 'negative', message: parseApiError(err, 'Erro ao actualizar atendimento') })
+      } finally {
+        savingEditAtendimento.value = false
       }
     }
 
@@ -1051,6 +1378,8 @@ export default {
         savingCall.value ||
         dialogRegistarAtendimento.value ||
         savingAtendimento.value ||
+        dialogEditarAtendimento.value ||
+        savingEditAtendimento.value ||
         viewMode.value !== 'leads'
       )
     }
@@ -1071,10 +1400,10 @@ export default {
     watch([dateFrom, dateTo], saveState)
     watch(pagination, saveState, { deep: true })
     watch(
-      () => formAtendimento.value.persona,
+      () => formEditAtendimento.value.persona,
       (persona) => {
         if (persona !== 'prep_exame_inatro' && persona !== 'iniciante') {
-          formAtendimento.value.persona_subtipo = ''
+          formEditAtendimento.value.persona_subtipo = ''
         }
       }
     )
@@ -1128,6 +1457,14 @@ export default {
       dialogDetalheAtendimento,
       atendimentoDetalhe,
       openDetalheAtendimento,
+      dialogEditarAtendimento,
+      editAtendimentoMeta,
+      formEditAtendimento,
+      savingEditAtendimento,
+      openEditarAtendimento,
+      openEditarAtendimentoFromDetalhe,
+      closeEditarAtendimento,
+      guardarEdicaoAtendimento,
     }
   },
 }
@@ -1188,6 +1525,11 @@ export default {
   margin-bottom: 4px;
 }
 
+.form-section-highlight {
+  border-color: #a5d6a7;
+  background: #f1f8f4;
+}
+
 .form-section-title {
   font-size: 0.8rem;
   font-weight: 700;
@@ -1242,6 +1584,11 @@ export default {
 
 .body--dark .subtipo-box {
   background: #333;
+}
+
+.body--dark .form-section-highlight {
+  background: rgba(46, 125, 50, 0.12);
+  border-color: rgba(129, 199, 132, 0.35);
 }
 
 .body--dark .atendimento-dialog-actions {
