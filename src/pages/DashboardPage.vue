@@ -1,99 +1,92 @@
 <template>
   <q-page class="dashboard-page">
-    <!-- Header with Date Filter -->
     <div class="row justify-between items-center q-mb-lg">
       <div class="col">
         <h1 class="text-h4 text-weight-bold text-white">Painel</h1>
-        <p class="text-subtitle1 text-grey-4">Visão geral das transações e usuários</p>
+        <p class="text-subtitle1 text-grey-4">Visão geral operacional do painel administrativo</p>
       </div>
       <div class="col-auto">
         <q-btn-dropdown
           color="accent"
-          label="Últimos 7 dias"
+          :label="periodLabel"
           class="date-filter"
           menu-anchor="bottom right"
           menu-self="top right"
         >
           <q-list>
-            <q-item clickable v-close-popup>
+            <q-item clickable v-close-popup @click="setPeriod('all')">
+              <q-item-section>Tempo real (tudo)</q-item-section>
+            </q-item>
+            <q-item clickable v-close-popup @click="setPeriod('today')">
               <q-item-section>Hoje</q-item-section>
             </q-item>
-            <q-item clickable v-close-popup>
+            <q-item clickable v-close-popup @click="setPeriod('week')">
               <q-item-section>Últimos 7 dias</q-item-section>
             </q-item>
-            <q-item clickable v-close-popup>
+            <q-item clickable v-close-popup @click="setPeriod('month')">
               <q-item-section>Este mês</q-item-section>
-            </q-item>
-            <q-item clickable v-close-popup>
-              <q-item-section>Personalizado</q-item-section>
             </q-item>
           </q-list>
         </q-btn-dropdown>
       </div>
     </div>
 
-    <!-- Stats Cards -->
+    <q-banner v-if="loadError" dense rounded class="bg-negative text-white q-mb-md">
+      {{ loadError }}
+    </q-banner>
+
     <div class="row q-col-gutter-lg q-mb-lg">
       <div class="col-12 col-md-3">
         <stat-card
           icon="people"
           title="Total de Usuários"
-          value="2,458"
-          trend="12%"
+          :value="formatCount(dashboardStats.totalUsers)"
+          :trend="periodTrendLabel"
           :is-positive="true"
           color="primary"
         />
       </div>
       <div class="col-12 col-md-3">
         <stat-card
-          icon="active_users"
-          title="Usuários Ativos"
-          value="1,892"
-          trend="8%"
-          :is-positive="true"
+          icon="person_search"
+          title="Sem Pagamento"
+          :value="formatCount(dashboardStats.unpaidUsers)"
+          trend="necessita acompanhamento"
+          :is-positive="false"
           color="secondary"
         />
       </div>
       <div class="col-12 col-md-3">
         <stat-card
           icon="payments"
-          title="Pagamentos"
-          value="1,756"
-          trend="5%"
+          title="Pagamentos Validados"
+          :value="formatCount(dashboardStats.validatedPayments)"
+          trend="vinculados no painel"
           :is-positive="true"
           color="accent"
         />
       </div>
       <div class="col-12 col-md-3">
         <stat-card
-          icon="pending"
-          title="Pendentes"
-          value="342"
-          trend="3%"
+          icon="warning"
+          title="Pagamentos Falhados"
+          :value="formatCount(dashboardStats.failedPayments)"
+          trend="precisam assistência"
           :is-positive="false"
           color="negative"
         />
       </div>
     </div>
 
-    <!-- Main Content -->
     <div class="row q-col-gutter-lg">
-      <!-- Left Column -->
       <div class="col-12 col-lg-8">
-        <!-- Revenue Chart -->
         <q-card class="glass-card q-mb-lg">
           <q-card-section>
             <div class="row justify-between items-center">
               <div>
-                <h2 class="text-h6 text-weight-bold">Pagamentos Mensais</h2>
-                <p class="text-caption text-grey-4">Performance dos últimos 12 meses</p>
+                <h2 class="text-h6 text-weight-bold">Evolução Semanal</h2>
+                <p class="text-caption text-grey-4">Últimas 4 semanas — validados vs falhados</p>
               </div>
-              <q-btn
-                flat
-                round
-                icon="more_vert"
-                color="grey-6"
-              />
             </div>
             <div class="chart-container">
               <canvas ref="revenueChart"></canvas>
@@ -101,26 +94,19 @@
           </q-card-section>
         </q-card>
 
-        <!-- Recent Transactions -->
         <q-card class="glass-card">
           <q-card-section>
             <div class="row justify-between items-center q-mb-md">
               <div>
-                <h2 class="text-h6 text-weight-bold">Transações Recentes</h2>
-                <p class="text-caption text-grey-4">Últimas 20 transações</p>
+                <h2 class="text-h6 text-weight-bold">Atividade Recente</h2>
+                <p class="text-caption text-grey-4">Validações e falhas no período seleccionado</p>
               </div>
-              <q-btn
-                color="accent"
-                label="Ver todas"
-                flat
-                dense
-                to="/transactions"
-              />
+              <q-btn color="accent" label="Ver pagamentos" flat dense to="/payments" />
             </div>
 
             <q-table
               flat
-              :rows="recentTransactions"
+              :rows="recentActivity"
               :columns="transactionColumns"
               row-key="id"
               hide-pagination
@@ -138,32 +124,53 @@
                   <span class="text-weight-bold">{{ formatCurrency(props.row.amount) }}</span>
                 </q-td>
               </template>
+
+              <template v-slot:body-cell-reference="props">
+                <q-td :props="props">
+                  {{ props.row.reference }}
+                  <div v-if="props.row.timestamp" class="text-caption text-grey-5">
+                    {{ formatActivityDate(props.row.timestamp) }}
+                  </div>
+                </q-td>
+              </template>
             </q-table>
           </q-card-section>
         </q-card>
       </div>
 
-      <!-- Right Column -->
       <div class="col-12 col-lg-4">
-        <!-- Payment Status -->
         <q-card class="glass-card q-mb-lg">
           <q-card-section>
             <h2 class="text-h6 text-weight-bold">Status de Pagamentos</h2>
-            <p class="text-caption text-grey-4">Distribuição por status</p>
+            <p class="text-caption text-grey-4">Distribuição no período</p>
             <div class="chart-container">
               <canvas ref="paymentStatusChart"></canvas>
             </div>
           </q-card-section>
         </q-card>
 
-        <!-- Top Providers -->
         <q-card class="glass-card">
           <q-card-section>
-            <h2 class="text-h6 text-weight-bold">Provedores</h2>
-            <p class="text-caption text-grey-4">Distribuição por provedor</p>
-            <div class="chart-container">
-              <canvas ref="providersChart"></canvas>
-            </div>
+            <h2 class="text-h6 text-weight-bold">Resumo rápido</h2>
+            <p class="text-caption text-grey-4">Atalhos para operação</p>
+            <q-list dense class="text-grey-3 q-pa-sm">
+              <q-item clickable to="/users">
+                <q-item-section avatar><q-icon name="person_search" color="primary" /></q-item-section>
+                <q-item-section>Consulta de utilizador</q-item-section>
+              </q-item>
+              <q-item clickable to="/payments">
+                <q-item-section avatar><q-icon name="payments" color="positive" /></q-item-section>
+                <q-item-section>Pagamentos e vinculação</q-item-section>
+              </q-item>
+              <q-item clickable to="/relatorios">
+                <q-item-section avatar><q-icon name="assignment" color="orange" /></q-item-section>
+                <q-item-section>Utilizadores sem pagamento</q-item-section>
+              </q-item>
+              <q-item clickable to="/pagamentos-falhados">
+                <q-item-section avatar><q-icon name="report_problem" color="negative" /></q-item-section>
+                <q-item-section>Pagamentos falhados</q-item-section>
+              </q-item>
+            </q-list>
           </q-card-section>
         </q-card>
       </div>
@@ -172,11 +179,18 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { api } from 'boot/axios'
 import Chart from 'chart.js/auto'
 import StatCard from 'components/StatCard.vue'
 import StatusBadge from 'components/StatusBadge.vue'
+
+const PERIOD_LABELS = {
+  all: 'Tempo real (tudo)',
+  today: 'Hoje',
+  week: 'Últimos 7 dias',
+  month: 'Este mês'
+}
 
 export default {
   components: {
@@ -185,10 +199,27 @@ export default {
   },
   setup() {
     const loading = ref(false)
-    const recentTransactions = ref([])
+    const loadError = ref('')
+    const selectedPeriod = ref('all')
+    const recentActivity = ref([])
+    const weeklySeries = ref({ labels: [], validated: [], failed: [] })
     const revenueChart = ref(null)
     const paymentStatusChart = ref(null)
-    const providersChart = ref(null)
+    const dashboardStats = ref({
+      totalUsers: 0,
+      unpaidUsers: 0,
+      validatedPayments: 0,
+      failedPayments: 0
+    })
+
+    let revenueChartInstance = null
+    let paymentStatusChartInstance = null
+
+    const periodLabel = computed(() => PERIOD_LABELS[selectedPeriod.value] || PERIOD_LABELS.all)
+    const periodTrendLabel = computed(() => {
+      if (selectedPeriod.value === 'all') return 'total na base'
+      return periodLabel.value.toLowerCase()
+    })
 
     const transactionColumns = [
       { name: 'reference', label: 'Referência', field: 'reference', align: 'left' },
@@ -197,82 +228,90 @@ export default {
       { name: 'status', label: 'Status', field: 'status', align: 'center' }
     ]
 
-    const fetchRecentTransactions = async () => {
-      loading.value = true
-      try {
-        const response = await api.get('/reports', {
-          params: {
-            per_page: 5,
-            sort_by: 'created_at',
-            order: 'desc'
-          }
-        })
-        recentTransactions.value = response.data.data
-      } catch (error) {
-        console.error('Error fetching transactions:', error)
-      } finally {
-        loading.value = false
-      }
+    const formatActivityDate = (value) => {
+      if (!value) return '-'
+      const dt = new Date(value)
+      if (Number.isNaN(dt.getTime())) return value
+      return dt.toLocaleString('pt-PT')
     }
 
-    const initCharts = () => {
-      // Revenue Chart
-      new Chart(revenueChart.value.getContext('2d'), {
+    const formatCount = (value) => {
+      return new Intl.NumberFormat('pt-PT').format(Number(value || 0))
+    }
+
+    const renderCharts = () => {
+      if (!revenueChart.value || !paymentStatusChart.value) return
+      if (revenueChartInstance) revenueChartInstance.destroy()
+      if (paymentStatusChartInstance) paymentStatusChartInstance.destroy()
+
+      const labels = weeklySeries.value.labels.length
+        ? weeklySeries.value.labels
+        : ['—', '—', '—', '—']
+      const validatedData = weeklySeries.value.validated.length
+        ? weeklySeries.value.validated
+        : [0, 0, 0, 0]
+      const failedData = weeklySeries.value.failed.length
+        ? weeklySeries.value.failed
+        : [0, 0, 0, 0]
+
+      revenueChartInstance = new Chart(revenueChart.value.getContext('2d'), {
         type: 'line',
         data: {
-          labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-          datasets: [{
-            label: 'Pagamentos',
-            data: [12000, 19000, 15000, 18000, 22000, 24000, 28000, 26000, 30000, 32000, 35000, 38000],
-            borderColor: '#4CAF50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-            borderWidth: 2,
-            tension: 0.4,
-            fill: true
-          }]
+          labels,
+          datasets: [
+            {
+              label: 'Validados',
+              data: validatedData,
+              borderColor: '#4CAF50',
+              backgroundColor: 'rgba(76, 175, 80, 0.1)',
+              borderWidth: 2,
+              tension: 0.4,
+              fill: true
+            },
+            {
+              label: 'Falhados',
+              data: failedData,
+              borderColor: '#F44336',
+              backgroundColor: 'rgba(244, 67, 54, 0.08)',
+              borderWidth: 2,
+              tension: 0.4,
+              fill: true
+            }
+          ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              display: false
+              labels: { color: '#E0E0E0' }
             }
           },
           scales: {
             y: {
               beginAtZero: true,
-              grid: {
-                color: 'rgba(255, 255, 255, 0.1)'
-              },
-              ticks: {
-                color: '#BDBDBD'
-              }
+              ticks: { stepSize: 1, color: '#BDBDBD' },
+              grid: { color: 'rgba(255, 255, 255, 0.1)' }
             },
             x: {
-              grid: {
-                color: 'rgba(255, 255, 255, 0.1)'
-              },
-              ticks: {
-                color: '#BDBDBD'
-              }
+              grid: { color: 'rgba(255, 255, 255, 0.1)' },
+              ticks: { color: '#BDBDBD' }
             }
           }
         }
       })
 
-      // Payment Status Chart
-      new Chart(paymentStatusChart.value.getContext('2d'), {
+      const validated = dashboardStats.value.validatedPayments
+      const failed = dashboardStats.value.failedPayments
+      const unpaid = dashboardStats.value.unpaidUsers
+
+      paymentStatusChartInstance = new Chart(paymentStatusChart.value.getContext('2d'), {
         type: 'doughnut',
         data: {
           labels: ['Pago', 'Pendente', 'Falha'],
           datasets: [{
-            data: [65, 20, 15],
-            backgroundColor: [
-              '#4CAF50',
-              '#FFC107',
-              '#F44336'
-            ],
+            data: [validated, unpaid, failed],
+            backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
             borderWidth: 0
           }]
         },
@@ -292,73 +331,76 @@ export default {
           }
         }
       })
+    }
 
-      // Providers Chart
-      new Chart(providersChart.value.getContext('2d'), {
-        type: 'bar',
-        data: {
-          labels: ['Mpesa', 'Emola', 'Outros'],
-          datasets: [{
-            data: [45, 35, 20],
-            backgroundColor: [
-              '#4CAF50',
-              '#8BC34A',
-              '#CDDC39'
-            ],
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: false
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              grid: {
-                color: 'rgba(255, 255, 255, 0.1)'
-              },
-              ticks: {
-                color: '#BDBDBD'
-              }
-            },
-            x: {
-              grid: {
-                display: false
-              },
-              ticks: {
-                color: '#BDBDBD'
-              }
-            }
-          }
+    const loadDashboardData = async () => {
+      loading.value = true
+      loadError.value = ''
+      try {
+        const response = await api.get('/users/dashboard-stats/', {
+          params: { period: selectedPeriod.value }
+        })
+        const data = response.data || {}
+        const counts = data.counts || {}
+
+        dashboardStats.value = {
+          totalUsers: counts.total_users || 0,
+          unpaidUsers: counts.unpaid_users || 0,
+          validatedPayments: counts.validated_payments || 0,
+          failedPayments: counts.failed_payments || 0
         }
-      })
+
+        weeklySeries.value = data.weekly_series || { labels: [], validated: [], failed: [] }
+        recentActivity.value = Array.isArray(data.recent_activity) ? data.recent_activity : []
+
+        renderCharts()
+      } catch (error) {
+        console.error('Erro ao carregar dashboard:', error)
+        loadError.value =
+          error.response?.data?.detail ||
+          error.response?.data?.error ||
+          'Não foi possível carregar o dashboard.'
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const setPeriod = (period) => {
+      selectedPeriod.value = period
+      loadDashboardData()
     }
 
     const formatCurrency = (value) => {
       return new Intl.NumberFormat('pt-MZ', {
         style: 'currency',
         currency: 'MZN'
-      }).format(value)
+      }).format(Number(value || 0))
     }
 
     onMounted(() => {
-      fetchRecentTransactions()
-      initCharts()
+      loadDashboardData()
+    })
+
+    onBeforeUnmount(() => {
+      if (revenueChartInstance) revenueChartInstance.destroy()
+      if (paymentStatusChartInstance) paymentStatusChartInstance.destroy()
     })
 
     return {
       loading,
-      recentTransactions,
+      loadError,
+      selectedPeriod,
+      periodLabel,
+      periodTrendLabel,
+      recentActivity,
+      dashboardStats,
       transactionColumns,
       revenueChart,
       paymentStatusChart,
-      providersChart,
-      formatCurrency
+      formatCurrency,
+      formatCount,
+      formatActivityDate,
+      setPeriod
     }
   }
 }
@@ -367,10 +409,6 @@ export default {
 <style lang="scss">
 .text-h6 {
   color: #E0E0E0;
-}
-
-.col-12 {
-  color: orangered;
 }
 
 .dashboard-page {

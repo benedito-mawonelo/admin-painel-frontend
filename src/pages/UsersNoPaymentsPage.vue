@@ -136,6 +136,15 @@
         <template v-else>
           <q-btn
             outline
+            color="secondary"
+            icon="download"
+            label="Exportar CSV"
+            no-caps
+            :disable="loadingAtendimentos || !atendimentosRows.length"
+            @click="exportarAtendimentosCsv"
+          />
+          <q-btn
+            outline
             color="primary"
             icon="arrow_back"
             label="Voltar à lista"
@@ -1236,6 +1245,96 @@ export default {
       }
     }
 
+    const csvEscape = (value) => {
+      if (value === null || value === undefined) return ''
+      const text = String(value).replace(/"/g, '""')
+      return `"${text}"`
+    }
+
+    const simNao = (flag) => (flag ? 'Sim' : 'Não')
+
+    function nomeFicheiroAtendimentosCsv() {
+      const today = new Date().toISOString().slice(0, 10)
+      const from = filtroAtendDateFrom.value
+      const to = filtroAtendDateTo.value
+      if (from && to) return `atendimentos-${from}_a_${to}.csv`
+      if (from) return `atendimentos-desde-${from}.csv`
+      if (to) return `atendimentos-ate-${to}.csv`
+      return `atendimentos-${today}.csv`
+    }
+
+    function exportarAtendimentosCsv() {
+      if (!atendimentosRows.value.length) {
+        $q.notify({
+          type: 'warning',
+          message: 'Não há registos para exportar. Ajuste os filtros ou registe atendimentos.',
+        })
+        return
+      }
+
+      const header = [
+        'ID',
+        'Data contacto',
+        'Nome',
+        'Nº cadastro',
+        'Feedback',
+        'Persona',
+        'Sub-tipo persona',
+        'Nº pagamento',
+        'Android',
+        'iPhone',
+        'Nova versão',
+        'Mesmo celular',
+        'Como soube',
+        'Observações',
+        'Registado por',
+        'Criado em',
+      ]
+
+      const lines = [header.map(csvEscape).join(',')]
+
+      atendimentosRows.value.forEach((row) => {
+        lines.push(
+          [
+            row.id,
+            formatDateTime(row.contactado_em),
+            row.target_user_name,
+            row.target_user_telefone,
+            row.feedback_label || row.feedback,
+            row.persona_label || row.persona,
+            row.persona_subtipo_label || row.persona_subtipo || '',
+            row.numero_pagamento || '',
+            simNao(row.usa_android),
+            simNao(row.usa_iphone),
+            simNao(row.nova_versao),
+            row.mesmo_celular_app_label || row.mesmo_celular_app || '',
+            row.como_soube || '',
+            row.observacoes || '',
+            row.staff_name || '',
+            formatDateTime(row.created_at),
+          ]
+            .map(csvEscape)
+            .join(',')
+        )
+      })
+
+      const csvContent = '\uFEFF' + lines.join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = nomeFicheiroAtendimentosCsv()
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      $q.notify({
+        type: 'positive',
+        message: `${atendimentosRows.value.length} registo(s) exportado(s) para CSV.`,
+      })
+    }
+
     function clearDates() {
       dateFrom.value = ''
       dateTo.value = ''
@@ -1741,6 +1840,7 @@ export default {
       filtroAtendTelefone,
       filtroAtendOnlyMine,
       loadAtendimentos,
+      exportarAtendimentosCsv,
       showRegistos,
       dialogDetalheAtendimento,
       atendimentoDetalhe,
