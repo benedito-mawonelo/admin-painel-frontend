@@ -133,23 +133,80 @@
           </div>
 
           <div class="col-12 col-md-auto">
-            <q-toggle
-              v-model="compararPeriodo"
-              dense
+            <q-btn
               color="primary"
-              label="Comparar com período anterior"
-              @update:model-value="carregar"
+              icon="refresh"
+              label="Actualizar"
+              no-caps
+              unelevated
+              :loading="loading"
+              @click="carregar"
             />
           </div>
+        </div>
 
-          <template v-if="compararPeriodo">
-            <div class="col-12 col-md-3">
+        <q-separator class="q-my-md" />
+
+        <div class="stats-compare-filters">
+          <div class="row items-center q-col-gutter-md">
+            <div class="col-12 col-md">
+              <q-toggle
+                v-model="compararPeriodo"
+                dense
+                color="primary"
+                label="Comparar com o período anterior"
+                @update:model-value="carregar"
+              />
+              <div class="text-caption text-grey-7 q-mt-xs q-ml-xl">
+                {{ textoExplicacaoComparacao }}
+              </div>
+            </div>
+            <div v-if="compararPeriodo" class="col-12 col-md-auto">
+              <q-btn
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="restart_alt"
+                label="Repor período automático"
+                @click="reporComparacaoAutomatica"
+              />
+            </div>
+          </div>
+
+          <div v-if="compararPeriodo" class="stats-compare-summary q-mt-md">
+            <div class="row q-col-gutter-sm items-stretch">
+              <div class="col-12 col-md-6">
+                <div class="stats-compare-period stats-compare-period--actual">
+                  <div class="text-caption text-weight-bold text-uppercase">Período actual</div>
+                  <div class="text-body2 text-weight-medium q-mt-xs">{{ tituloResultados }}</div>
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="stats-compare-period stats-compare-period--previous">
+                  <div class="text-caption text-weight-bold text-uppercase">Período anterior</div>
+                  <div class="text-body2 text-weight-medium q-mt-xs">{{ tituloPeriodoAnterior }}</div>
+                  <div v-if="usaComparacaoAutomatica" class="text-caption text-grey-6 q-mt-xs">
+                    Definido automaticamente
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="compararPeriodo" class="row q-col-gutter-md q-mt-md items-end">
+            <div class="col-12">
+              <div class="text-caption text-grey-7 text-weight-medium">
+                Personalizar período anterior (opcional)
+              </div>
+            </div>
+            <div class="col-12 col-md-5">
               <q-input
                 v-model="dataComparacaoInicioDisplay"
                 outlined
                 dense
                 readonly
-                label="Comparação: data início"
+                label="Início do período anterior"
                 :hint="hintComparacaoRange"
               >
                 <template v-slot:append>
@@ -165,13 +222,13 @@
                 </template>
               </q-input>
             </div>
-            <div class="col-12 col-md-3">
+            <div class="col-12 col-md-5">
               <q-input
                 v-model="dataComparacaoFimDisplay"
                 outlined
                 dense
                 readonly
-                label="Comparação: data fim"
+                label="Fim do período anterior"
               >
                 <template v-slot:append>
                   <q-icon name="event" class="cursor-pointer">
@@ -186,18 +243,6 @@
                 </template>
               </q-input>
             </div>
-          </template>
-
-          <div class="col-12 col-md-auto">
-            <q-btn
-              color="primary"
-              icon="refresh"
-              label="Actualizar"
-              no-caps
-              unelevated
-              :loading="loading"
-              @click="carregar"
-            />
           </div>
         </div>
       </q-card-section>
@@ -249,17 +294,35 @@
             </div>
             <div
               v-if="kpi.comparacao"
-              class="text-caption text-weight-medium q-mt-xs"
-              :class="kpi.comparacao.class"
+              class="stats-kpi-compare q-mt-sm"
             >
-              <q-icon :name="kpi.comparacao.icon" size="14px" class="q-mr-xs" />
-              {{ kpi.comparacao.label }}
-              <span class="text-grey-6"> vs {{ tituloPeriodoAnterior }}</span>
+              <div class="text-caption text-grey-7">
+                {{ kpi.comparacao.resumo }}
+              </div>
+              <div
+                class="text-caption text-weight-medium q-mt-xs"
+                :class="kpi.comparacao.class"
+              >
+                <q-icon :name="kpi.comparacao.icon" size="14px" class="q-mr-xs" />
+                {{ kpi.comparacao.label }}
+              </div>
             </div>
           </q-card-section>
         </q-card>
       </div>
     </div>
+
+    <q-banner
+      v-if="compararPeriodo && !loading && !comparacaoDisponivel"
+      rounded
+      class="stats-alert-banner q-mb-md"
+      dense
+    >
+      <template v-slot:avatar>
+        <q-icon name="compare_arrows" color="warning" />
+      </template>
+      A comparação com o período anterior não está disponível. Verifique as datas ou tente actualizar.
+    </q-banner>
 
     <!-- Comparativo período actual vs anterior -->
     <q-card
@@ -272,15 +335,30 @@
         <div class="row items-center q-col-gutter-md q-mb-md">
           <div class="col">
             <div class="text-subtitle1 text-weight-bold text-grey-9">
-              Comparativo de períodos
+              Comparação: período actual vs período anterior
             </div>
-            <div class="text-caption text-grey-7">
-              {{ tituloResultados }}
-              <q-icon name="compare_arrows" size="16px" class="q-mx-xs" />
-              {{ tituloPeriodoAnterior }}
+            <div class="text-caption text-grey-7 q-mt-xs">
+              Cada métrica mostra o valor do período actual, o do período anterior e a diferença em linguagem clara
+              (ex.: «Menos 1 378 que no período anterior (−62,6% vs anterior)»).
             </div>
           </div>
         </div>
+
+        <div class="row q-col-gutter-sm q-mb-lg">
+          <div class="col-12 col-md-6">
+            <div class="stats-compare-period stats-compare-period--actual">
+              <div class="text-caption text-weight-bold text-uppercase">Período actual</div>
+              <div class="text-body2 text-weight-medium q-mt-xs">{{ tituloResultados }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="stats-compare-period stats-compare-period--previous">
+              <div class="text-caption text-weight-bold text-uppercase">Período anterior</div>
+              <div class="text-body2 text-weight-medium q-mt-xs">{{ tituloPeriodoAnterior }}</div>
+            </div>
+          </div>
+        </div>
+
         <div class="row q-col-gutter-md q-mb-lg">
           <div
             v-for="bloco in comparativoResumoBlocos"
@@ -289,9 +367,9 @@
           >
             <div class="stats-compare-metric">
               <div class="text-caption text-grey-7">{{ bloco.label }}</div>
-              <div class="row items-baseline q-gutter-sm q-mt-xs">
-                <span class="text-h6 text-weight-bold">{{ bloco.actual }}</span>
-                <span class="text-body2 text-grey-6">/ {{ bloco.anterior }}</span>
+              <div class="text-h6 text-weight-bold q-mt-xs">{{ bloco.actual }}</div>
+              <div class="text-caption text-grey-6 q-mt-xs">
+                Anterior: <strong>{{ bloco.anterior }}</strong>
               </div>
               <div class="text-caption q-mt-xs" :class="bloco.variacao.class">
                 <q-icon :name="bloco.variacao.icon" size="14px" class="q-mr-xs" />
@@ -302,49 +380,42 @@
         </div>
 
         <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm">
-          Por angariador
+          Detalhe por angariador
+        </div>
+        <div class="text-caption text-grey-7 q-mb-sm">
+          «Actual» = {{ tituloResultados }} · «Anterior» = {{ tituloPeriodoAnterior }}
         </div>
         <q-markup-table flat bordered separator="horizontal" class="stats-compare-table">
           <thead>
             <tr>
-              <th class="text-left">Angariador</th>
-              <th class="text-center">Leads</th>
-              <th class="text-center">Convertidos</th>
-              <th class="text-center">Pontos</th>
-              <th class="text-center">Taxa conv.</th>
+              <th class="text-left" rowspan="2">Angariador</th>
+              <th class="text-center" colspan="2">Leads</th>
+              <th class="text-center" colspan="2">Convertidos</th>
+              <th class="text-center" colspan="2">Pontos</th>
+              <th class="text-center" colspan="2">Taxa conv.</th>
+            </tr>
+            <tr>
+              <th class="text-center text-caption">Actual</th>
+              <th class="text-center text-caption">Anterior</th>
+              <th class="text-center text-caption">Actual</th>
+              <th class="text-center text-caption">Anterior</th>
+              <th class="text-center text-caption">Actual</th>
+              <th class="text-center text-caption">Anterior</th>
+              <th class="text-center text-caption">Actual</th>
+              <th class="text-center text-caption">Anterior</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in resultadosComparacao" :key="`cmp-${row.angariador_id}`">
               <td class="text-weight-medium">{{ row.nome }}</td>
-              <td class="text-center">
-                <div>{{ row.total_angariados }}</div>
-                <div class="text-caption text-grey-6">
-                  ant. {{ row.anterior.total_angariados }}
-                  <span :class="row.variacao.leads.class"> · {{ row.variacao.leads.label }}</span>
-                </div>
-              </td>
-              <td class="text-center">
-                <div>{{ row.total_convertidos }}</div>
-                <div class="text-caption text-grey-6">
-                  ant. {{ row.anterior.total_convertidos }}
-                  <span :class="row.variacao.convertidos.class"> · {{ row.variacao.convertidos.label }}</span>
-                </div>
-              </td>
-              <td class="text-center">
-                <div>{{ row.total_pontos }}</div>
-                <div class="text-caption text-grey-6">
-                  ant. {{ row.anterior.total_pontos }}
-                  <span :class="row.variacao.pontos.class"> · {{ row.variacao.pontos.label }}</span>
-                </div>
-              </td>
-              <td class="text-center">
-                <div>{{ row.taxa_conversao }}%</div>
-                <div class="text-caption text-grey-6">
-                  ant. {{ row.anterior.taxa_conversao }}%
-                  <span :class="row.variacao.taxa.class"> · {{ row.variacao.taxa.label }}</span>
-                </div>
-              </td>
+              <td class="text-center text-weight-medium">{{ row.total_angariados }}</td>
+              <td class="text-center text-grey-7">{{ row.anterior.total_angariados }}</td>
+              <td class="text-center text-weight-medium">{{ row.total_convertidos }}</td>
+              <td class="text-center text-grey-7">{{ row.anterior.total_convertidos }}</td>
+              <td class="text-center text-weight-medium">{{ row.total_pontos }}</td>
+              <td class="text-center text-grey-7">{{ row.anterior.total_pontos }}</td>
+              <td class="text-center text-weight-medium">{{ row.taxa_conversao }}%</td>
+              <td class="text-center text-grey-7">{{ row.anterior.taxa_conversao }}%</td>
             </tr>
           </tbody>
         </q-markup-table>
@@ -449,43 +520,6 @@
       </div>
     </div>
 
-    <q-card flat bordered class="stats-panel-card q-mb-xl">
-      <q-card-section>
-        <div class="text-subtitle1 text-weight-bold text-grey-9 q-mb-xs">
-          Indicadores de conformidade do período
-        </div>
-        <div class="text-caption text-grey-7 q-mb-md">
-          Operacional (pagamentos e desbloqueios reais) — separado dos convertidos com pontos
-        </div>
-        <div class="row q-col-gutter-md">
-          <div class="col-12 col-md-4">
-            <div class="text-caption text-grey-7">Pagamentos angariados fora da janela (sem pontos)</div>
-            <div class="text-h5 text-weight-bold text-warning q-mt-xs">
-              {{ resumo.total_pagamentos_fora_15m ?? 0 }}
-            </div>
-            <div class="text-caption text-grey-6 q-mt-xs">
-              Com pontos atribuídos: {{ resumo.total_convertidos_fora_15m ?? 0 }}
-            </div>
-          </div>
-          <div class="col-12 col-md-4">
-            <div class="text-caption text-grey-7">Desbloqueios manuais no painel (ADMIN)</div>
-            <div class="text-h5 text-weight-bold text-info q-mt-xs">
-              {{ resumo.total_desbloqueios_painel ?? 0 }}
-            </div>
-            <div class="text-caption text-grey-6 q-mt-xs">
-              Clientes angariados: {{ resumo.total_desbloqueios_painel_angariados ?? 0 }}
-            </div>
-          </div>
-          <div class="col-12 col-md-4">
-            <div class="text-caption text-grey-7">Convertidos via painel (com pontos)</div>
-            <div class="text-h5 text-weight-bold text-grey-8 q-mt-xs">
-              {{ resumo.total_convertidos_via_painel ?? 0 }}
-            </div>
-          </div>
-        </div>
-      </q-card-section>
-    </q-card>
-
     <div class="stats-section-title q-mb-md q-mt-lg">
       PERFORMANCE POR ANGARIADOR
     </div>
@@ -500,20 +534,6 @@
     </div>
 
     <template v-else>
-      <!-- Máx. 3 banners — um angariador por linha -->
-      <div class="q-mb-lg">
-        <div
-          v-for="row in resultadosPerformance"
-          :key="`banner-${chaveAngariador(row)}`"
-          class="stats-alert-line q-mb-sm"
-        >
-          <q-icon name="notifications" size="20px" class="q-mr-sm text-warning" />
-          <span class="text-body2">
-            <strong>Atenção — {{ row.nome }}:</strong> {{ textoBannerAngariador(row) }}
-          </span>
-        </div>
-      </div>
-
       <div class="row q-col-gutter-lg q-mb-xl">
         <div
           v-for="(row, idx) in resultadosPerformance"
@@ -539,37 +559,51 @@
               <div class="col q-pl-md">
                 <div class="text-h6 text-weight-bold ellipsis">{{ row.nome }}</div>
                 <div class="text-body2 text-grey-7 q-mt-xs">
-                  Taxa: {{ row.taxa_conversao }}% · {{ etiquetaDesempenho(row) }}
+                  Meta {{ rotuloMetaPeriodo }}: {{ pctMetaConversao(row) }}% · {{ etiquetaDesempenho(row) }}
                 </div>
               </div>
             </div>
 
             <div class="stats-metric-list stats-metric-list--ref">
-              <div class="stats-metric-row">
+              <div class="stats-metric-row stats-metric-row--stacked">
                 <span>Leads angariados</span>
-                <strong>
-                  {{ row.total_angariados }}
-                  <span
+                <div class="stats-metric-values">
+                  <strong>{{ row.total_angariados }}</strong>
+                  <div
                     v-if="variacaoAngariador(row, 'total_angariados')"
-                    class="text-caption q-ml-xs"
-                    :class="variacaoAngariador(row, 'total_angariados').class"
+                    class="stats-variacao-block"
                   >
-                    {{ variacaoAngariador(row, 'total_angariados').label }}
-                  </span>
-                </strong>
+                    <div class="text-caption text-grey-7">
+                      {{ variacaoAngariador(row, 'total_angariados').resumo }}
+                    </div>
+                    <div
+                      class="text-caption"
+                      :class="variacaoAngariador(row, 'total_angariados').class"
+                    >
+                      {{ variacaoAngariador(row, 'total_angariados').label }}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="stats-metric-row">
+              <div class="stats-metric-row stats-metric-row--stacked">
                 <span>Convertidos</span>
-                <strong>
-                  {{ row.total_convertidos }}
-                  <span
+                <div class="stats-metric-values">
+                  <strong>{{ row.total_convertidos }}</strong>
+                  <div
                     v-if="variacaoAngariador(row, 'total_convertidos')"
-                    class="text-caption q-ml-xs"
-                    :class="variacaoAngariador(row, 'total_convertidos').class"
+                    class="stats-variacao-block"
                   >
-                    {{ variacaoAngariador(row, 'total_convertidos').label }}
-                  </span>
-                </strong>
+                    <div class="text-caption text-grey-7">
+                      {{ variacaoAngariador(row, 'total_convertidos').resumo }}
+                    </div>
+                    <div
+                      class="text-caption"
+                      :class="variacaoAngariador(row, 'total_convertidos').class"
+                    >
+                      {{ variacaoAngariador(row, 'total_convertidos').label }}
+                    </div>
+                  </div>
+                </div>
               </div>
               <div class="stats-metric-row">
                 <span>Pending ativos</span>
@@ -824,6 +858,7 @@ ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
 const AVATAR_CORES = ['primary', 'secondary', 'info', 'accent', 'positive', 'warning']
 const AVATAR_CORES_REF = ['positive', 'info', 'warning']
+const DIAS_UTEIS_SEMANA_META = 5
 
 const METAS_POR_PERIODO = {
   dia: { conv: 3, leads: 5 },
@@ -838,21 +873,79 @@ function fromYMD(ymd) {
   return new Date(y, m - 1, d)
 }
 
-function calcVariacao(actual, anterior) {
+function formatValorComparacao(val, tipo = 'numero') {
+  const n = Number(val) || 0
+  if (tipo === 'moeda') {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M MT`
+    if (n >= 10000) return `${(n / 1000).toFixed(1)}K MT`
+    return `${Math.round(n).toLocaleString('pt-PT')} MT`
+  }
+  if (tipo === 'percentagem') return `${n.toLocaleString('pt-PT')}%`
+  return n.toLocaleString('pt-PT')
+}
+
+function calcVariacao(actual, anterior, opts = {}) {
+  const tipo = opts.tipo || 'numero'
+  const invert = !!opts.invert
   const a = Number(actual) || 0
   const p = Number(anterior) || 0
   const delta = a - p
+  const actualFmt = formatValorComparacao(a, tipo)
+  const anteriorFmt = formatValorComparacao(p, tipo)
+  const resumo = `Actual: ${actualFmt} · Anterior: ${anteriorFmt}`
+
   if (delta === 0) {
-    return { delta: 0, label: 'igual', class: 'text-grey-7', icon: 'remove' }
+    return {
+      delta: 0,
+      label: 'Igual ao período anterior',
+      shortLabel: 'Igual ao anterior',
+      resumo,
+      class: 'text-grey-7',
+      icon: 'remove',
+      actualFmt,
+      anteriorFmt,
+    }
   }
-  const pct = p > 0 ? Math.round((delta / p) * 1000) / 10 : null
-  const sinal = delta > 0 ? '+' : ''
-  const pctTxt = pct != null ? ` (${sinal}${pct}%)` : ''
-  const label = `${sinal}${delta}${pctTxt}`
-  if (delta > 0) {
-    return { delta, label, class: 'text-positive', icon: 'trending_up' }
+
+  const pct = p > 0 ? Math.round((Math.abs(delta) / p) * 1000) / 10 : null
+  const absFmt = formatValorComparacao(
+    Math.abs(delta),
+    tipo === 'percentagem' ? 'numero' : tipo
+  )
+
+  let mudanca
+  if (tipo === 'percentagem') {
+    mudanca = delta > 0
+      ? `Taxa subiu ${absFmt} p.p.`
+      : `Taxa desceu ${absFmt} p.p.`
+  } else if (delta > 0) {
+    mudanca = `Mais ${absFmt} que no período anterior`
+  } else {
+    mudanca = `Menos ${absFmt} que no período anterior`
   }
-  return { delta, label, class: 'text-negative', icon: 'trending_down' }
+
+  let pctRelativo = ''
+  if (pct != null) {
+    const sinalPct = delta > 0 ? '+' : '−'
+    pctRelativo = ` (${sinalPct}${pct.toLocaleString('pt-PT')}% vs anterior)`
+  } else if (p === 0 && a > 0) {
+    pctRelativo = ' (não havia valor no período anterior)'
+  }
+
+  const label = `${mudanca}${pctRelativo}`
+  const melhor = invert ? delta < 0 : delta > 0
+  const pior = invert ? delta > 0 : delta < 0
+
+  return {
+    delta,
+    label,
+    shortLabel: mudanca,
+    resumo,
+    class: melhor ? 'text-positive' : pior ? 'text-negative' : 'text-grey-7',
+    icon: delta > 0 ? 'trending_up' : 'trending_down',
+    actualFmt,
+    anteriorFmt,
+  }
 }
 
 function iniciais(nome) {
@@ -883,7 +976,8 @@ const PACOTES_LABELS_FALLBACK = [
 ]
 
 const METAS_DIARIAS_FALLBACK = [6, 3, 5, 2, 3, 3]
-const METAS_MENSAIS_FALLBACK = METAS_DIARIAS_FALLBACK.map((m) => m * 22)
+const DIAS_META_MENSAL_PADRAO = 20
+const METAS_MENSAIS_FALLBACK = METAS_DIARIAS_FALLBACK.map((m) => m * DIAS_META_MENSAL_PADRAO)
 
 function chaveAngariador(row) {
   const id = row?.angariador_id ?? row?.id
@@ -1131,8 +1225,29 @@ export default {
     })
 
     const hintComparacaoRange = computed(() => {
-      return 'Se vazio, usa o período anterior automático'
+      if (periodo.value === 'dia') {
+        return 'Por defeito compara com o dia anterior ao seleccionado.'
+      }
+      if (periodo.value === 'semana') {
+        return 'Por defeito compara com a semana ISO anterior à seleccionada.'
+      }
+      return 'Por defeito compara com o mês anterior ao seleccionado.'
     })
+
+    const textoExplicacaoComparacao = computed(() => {
+      if (!compararPeriodo.value) {
+        if (periodo.value === 'dia') {
+          return 'Active para ver a diferença face ao dia anterior.'
+        }
+        if (periodo.value === 'semana') {
+          return 'Active para ver a diferença face à semana ISO anterior.'
+        }
+        return 'Active para ver a diferença face ao mês anterior.'
+      }
+      return hintComparacaoRange.value
+    })
+
+    const usaComparacaoAutomatica = computed(() => usaIntervaloComparacaoAutomatico())
 
     function getIntervaloAnteriorAutomatico() {
       if (periodo.value === 'mes') {
@@ -1173,6 +1288,11 @@ export default {
       const auto = getIntervaloAnteriorAutomatico()
       dataComparacaoInicio.value = auto.inicio || ''
       dataComparacaoFim.value = auto.fim || ''
+    }
+
+    function reporComparacaoAutomatica() {
+      syncComparacaoDefault()
+      if (!loading.value) carregar()
     }
 
     const tituloResultados = computed(() => {
@@ -1226,18 +1346,24 @@ export default {
       if (!comparacaoDisponivel.value) return []
       const r = resumo.value
       const a = resumoAnterior.value
-      const mk = (key, label, campo) => ({
-        key,
-        label,
-        actual: r[campo] ?? 0,
-        anterior: a[campo] ?? 0,
-        variacao: calcVariacao(r[campo], a[campo]),
-      })
+      const mk = (key, label, campo, opts = {}) => {
+        const actual = r[campo] ?? 0
+        const anteriorVal = a[campo] ?? 0
+        const variacao = calcVariacao(actual, anteriorVal, opts)
+        return {
+          key,
+          label,
+          actual: variacao.actualFmt,
+          anterior: variacao.anteriorFmt,
+          variacao,
+        }
+      }
       return [
         mk('leads', 'Leads angariados', 'total_angariados'),
         mk('conv', 'Convertidos', 'total_convertidos'),
+        mk('receita', 'Receita real', 'total_receita_real', { tipo: 'moeda' }),
         mk('pts', 'Pontos', 'total_pontos'),
-        mk('taxa', 'Taxa conversão (%)', 'taxa_conversao_global'),
+        mk('taxa', 'Taxa de conversão', 'taxa_conversao_global', { tipo: 'percentagem' }),
       ]
     })
 
@@ -1273,7 +1399,7 @@ export default {
             leads: calcVariacao(row.total_angariados, anterior.total_angariados),
             convertidos: calcVariacao(row.total_convertidos, anterior.total_convertidos),
             pontos: calcVariacao(row.total_pontos, anterior.total_pontos),
-            taxa: calcVariacao(row.taxa_conversao, anterior.taxa_conversao),
+            taxa: calcVariacao(row.taxa_conversao, anterior.taxa_conversao, { tipo: 'percentagem' }),
           },
         }
       })
@@ -1439,7 +1565,24 @@ export default {
     }
 
     const metasPeriodo = computed(() => {
-      return METAS_POR_PERIODO[periodo.value] || METAS_POR_PERIODO.mes
+      const base = METAS_POR_PERIODO[periodo.value] || METAS_POR_PERIODO.mes
+      const metasDiarias = Array.isArray(metasPacotes.value?.metas_diarias)
+        ? metasPacotes.value.metas_diarias
+        : []
+      const totalMetaDiaria = metasDiarias.reduce((acc, val) => acc + (Number(val) || 0), 0)
+      let metaConversaoPeriodo = 0
+      if (periodo.value === 'dia') {
+        metaConversaoPeriodo = totalMetaDiaria
+      } else if (periodo.value === 'semana') {
+        metaConversaoPeriodo = totalMetaDiaria * DIAS_UTEIS_SEMANA_META
+      } else {
+        metaConversaoPeriodo = totalMetaDiaria * DIAS_META_MENSAL_PADRAO
+      }
+
+      return {
+        ...base,
+        conv: metaConversaoPeriodo > 0 ? metaConversaoPeriodo : base.conv,
+      }
     })
 
     const rotuloMetaPeriodo = computed(() => {
@@ -1448,10 +1591,11 @@ export default {
       return 'mensal'
     })
 
-    const formatReceitaEstimada = (pontos) => {
-      const mzn = (pontos || 0) * 50
-      if (mzn >= 1000) return `${(mzn / 1000).toFixed(1)}K`
-      return String(mzn)
+    const formatReceitaReal = (valor) => {
+      const mzn = Number(valor) || 0
+      if (mzn >= 1000000) return `${(mzn / 1000000).toFixed(1)}M`
+      if (mzn >= 10000) return `${(mzn / 1000).toFixed(1)}K`
+      return Math.round(mzn).toLocaleString('pt-PT')
     }
 
     const kpisTopo = computed(() => {
@@ -1462,7 +1606,7 @@ export default {
       const exp = r.pending_expirados ?? 0
       const ang = r.total_angariados ?? 0
       const pctExp = ang > 0 ? ((exp / ang) * 100).toFixed(1) : '0'
-      const pontos = r.total_pontos ?? 0
+      const receitaReal = r.total_receita_real ?? 0
       const chamadasTotal = chamadasResumo.value.total || 0
       const chamadasTop = (chamadasResumo.value.por_angariador || [])[0]
       const chamadasHint = modoChamadas.value === 'por_angariador'
@@ -1472,7 +1616,9 @@ export default {
               : 'Sem chamadas no período'
           )
         : `${chamadasTotal} chamada(s) no período`
-      const kpiCmp = (campo) => (cmp && ra ? calcVariacao(r[campo], ra[campo]) : null)
+      const kpiCmp = (campo, opts = {}) => (
+        cmp && ra ? calcVariacao(r[campo], ra[campo], opts) : null
+      )
       return [
         {
           key: 'leads',
@@ -1496,13 +1642,13 @@ export default {
         },
         {
           key: 'receita',
-          label: 'Receita estimada',
-          value: formatReceitaEstimada(pontos),
-          hint: 'MZN · via pontos (estimativa)',
+          label: 'Receita real',
+          value: formatReceitaReal(receitaReal),
+          hint: 'MZN · pagamentos concluídos (conversões)',
           hintClass: 'text-grey-7',
           valueClass: 'text-grey-9',
           colClass: 'col-sm-6 col-md-3',
-          comparacao: kpiCmp('total_pontos'),
+          comparacao: kpiCmp('total_receita_real', { tipo: 'moeda' }),
         },
         {
           key: 'exp',
@@ -1512,7 +1658,7 @@ export default {
           hintClass: exp > 0 ? 'text-negative' : 'text-grey-7',
           valueClass: exp > 0 ? 'text-negative' : 'text-grey-9',
           colClass: 'col-sm-6 col-md-3',
-          comparacao: kpiCmp('pending_expirados'),
+          comparacao: kpiCmp('pending_expirados', { invert: true }),
         },
         {
           key: 'chamadas',
@@ -1762,7 +1908,6 @@ export default {
 
     function buildQueryParamsBase() {
       return {
-        periodo: periodo.value,
         q: angariadorSeleccionado.value ? undefined : (q.value || undefined),
         angariador_id: angariadorSeleccionado.value?.id || undefined,
       }
@@ -1771,17 +1916,18 @@ export default {
     function buildQueryParams() {
       const base = buildQueryParamsBase()
       if (periodo.value === 'mes') {
-        return { ...base, mes: mes.value, ano: ano.value }
+        return { ...base, periodo: 'mes', mes: mes.value, ano: ano.value }
       }
       if (periodo.value === 'dia') {
-        return { ...base, data: dataDiaPicker.value }
+        return { ...base, periodo: 'dia', data: dataDiaPicker.value }
       }
       const d = fromYMD(dataSemanaPicker.value)
-      if (Number.isNaN(d.getTime())) return base
+      if (Number.isNaN(d.getTime())) return { ...base, periodo: 'semana' }
       const inicio = startOfISOWeek(d)
       const fim = endOfISOWeek(d)
       return {
         ...base,
+        periodo: 'semana',
         semana: getISOWeek(d),
         ano: getISOWeekYear(d),
         data_inicio: format(inicio, 'yyyy-MM-dd'),
@@ -1789,26 +1935,53 @@ export default {
       }
     }
 
+    function usaIntervaloComparacaoAutomatico() {
+      const auto = getIntervaloAnteriorAutomatico()
+      return (
+        dataComparacaoInicio.value === auto.inicio &&
+        dataComparacaoFim.value === auto.fim
+      )
+    }
+
     function buildQueryParamsAnterior() {
       const base = buildQueryParamsBase()
-      const d0 = fromYMD(dataComparacaoInicio.value)
-      const d1 = fromYMD(dataComparacaoFim.value)
-      if (!Number.isNaN(d0.getTime()) && !Number.isNaN(d1.getTime())) {
-        const inicio = d0 <= d1 ? dataComparacaoInicio.value : dataComparacaoFim.value
-        const fim = d0 <= d1 ? dataComparacaoFim.value : dataComparacaoInicio.value
-        return {
-          ...base,
-          periodo: 'semana',
-          data_inicio: inicio,
-          data_fim: fim,
-        }
-      }
       const auto = getIntervaloAnteriorAutomatico()
+
+      if (periodo.value === 'mes' && usaIntervaloComparacaoAutomatico()) {
+        let m = mes.value - 1
+        let y = ano.value
+        if (m < 1) {
+          m = 12
+          y -= 1
+        }
+        return { ...base, periodo: 'mes', mes: m, ano: y }
+      }
+
+      if (periodo.value === 'dia') {
+        const data =
+          usaIntervaloComparacaoAutomatico() || !dataComparacaoInicio.value
+            ? auto.inicio
+            : dataComparacaoInicio.value
+        if (!data) return null
+        return { ...base, periodo: 'dia', data }
+      }
+
+      const d0 = fromYMD(dataComparacaoInicio.value || auto.inicio)
+      const d1 = fromYMD(dataComparacaoFim.value || auto.fim)
+      if (Number.isNaN(d0.getTime()) || Number.isNaN(d1.getTime())) return null
+
+      const inicio = d0 <= d1
+        ? format(d0, 'yyyy-MM-dd')
+        : format(d1, 'yyyy-MM-dd')
+      const fim = d0 <= d1
+        ? format(d1, 'yyyy-MM-dd')
+        : format(d0, 'yyyy-MM-dd')
+
       return {
         ...base,
         periodo: 'semana',
-        data_inicio: auto.inicio,
-        data_fim: auto.fim,
+        data_inicio: inicio,
+        data_fim: fim,
       }
     }
 
@@ -1842,24 +2015,12 @@ export default {
     const carregar = async () => {
       loading.value = true
       resultadoStatsOk.value = false
+      comparacaoCarregada.value = false
+      resumoAnterior.value = null
+      resultadosAnterior.value = []
+
       try {
         const resp = await api.get('/angariadores/admin/stats/', { params: buildQueryParams() })
-        let respAnt = null
-        if (compararPeriodo.value) {
-          try {
-            respAnt = await api.get('/angariadores/admin/stats/', {
-              params: buildQueryParamsAnterior(),
-            })
-          } catch (errCmp) {
-            comparacaoCarregada.value = false
-            resumoAnterior.value = null
-            resultadosAnterior.value = []
-            $q.notify({
-              type: 'warning',
-              message: mensagemErroStats(errCmp, 'Período de comparação indisponível'),
-            })
-          }
-        }
         const body = resp.data || {}
         resumo.value = body.resumo || {}
         const tp = body.totais_plataforma || body.totaisPlataforma || {}
@@ -1883,21 +2044,34 @@ export default {
           body.metas_pacotes || body.metasPacotes,
           sorted
         )
-        if (compararPeriodo.value && respAnt) {
-          const bodyAnt = respAnt.data || {}
-          resumoAnterior.value = bodyAnt.resumo || {}
-          resultadosAnterior.value = deduplicarResultados(bodyAnt.resultados || [])
-          comparacaoCarregada.value = true
-        } else if (!compararPeriodo.value) {
-          comparacaoCarregada.value = false
-          resumoAnterior.value = null
-          resultadosAnterior.value = []
-        }
-        await carregarChamadasRegistadas()
         mesNome.value = body.mes_nome || ''
+
+        if (compararPeriodo.value) {
+          const paramsAnt = buildQueryParamsAnterior()
+          if (!paramsAnt) {
+            $q.notify({
+              type: 'warning',
+              message: 'Datas de comparação inválidas. Ajuste o intervalo ou repor datas automáticas.',
+            })
+          } else {
+            try {
+              const respAnt = await api.get('/angariadores/admin/stats/', { params: paramsAnt })
+              const bodyAnt = respAnt.data || {}
+              resumoAnterior.value = bodyAnt.resumo || {}
+              resultadosAnterior.value = deduplicarResultados(bodyAnt.resultados || [])
+              comparacaoCarregada.value = true
+            } catch (errCmp) {
+              $q.notify({
+                type: 'warning',
+                message: mensagemErroStats(errCmp, 'Período de comparação indisponível'),
+              })
+            }
+          }
+        }
+
+        await carregarChamadasRegistadas()
         resultadoStatsOk.value = true
       } catch (err) {
-        comparacaoCarregada.value = false
         $q.notify({
           type: 'negative',
           message: mensagemErroStats(err, 'Erro ao carregar estatísticas de angariadores'),
@@ -1933,6 +2107,7 @@ export default {
         'pagamentos_fora_15m',
         'desbloqueios_painel',
         'total_pontos',
+        'receita_real',
         'taxa_conversao',
       ]
 
@@ -1942,6 +2117,7 @@ export default {
       lines.push(['total_angariados', resumo.value.total_angariados || 0].map(csvEscape).join(','))
       lines.push(['total_convertidos', resumo.value.total_convertidos || 0].map(csvEscape).join(','))
       lines.push(['total_pontos', resumo.value.total_pontos || 0].map(csvEscape).join(','))
+      lines.push(['total_receita_real', resumo.value.total_receita_real || 0].map(csvEscape).join(','))
       lines.push(['pending_activos', resumo.value.pending_activos || 0].map(csvEscape).join(','))
       lines.push(['pending_expirados', resumo.value.pending_expirados || 0].map(csvEscape).join(','))
       lines.push(['taxa_conversao_global', resumo.value.taxa_conversao_global || 0].map(csvEscape).join(','))
@@ -1970,6 +2146,7 @@ export default {
             row.pagamentos_fora_15m ?? 0,
             row.desbloqueios_painel ?? 0,
             row.total_pontos,
+            row.receita_real ?? 0,
             row.taxa_conversao,
           ]
             .map(csvEscape)
@@ -2012,6 +2189,9 @@ export default {
       periodo,
       compararPeriodo,
       tituloPeriodoAnterior,
+      textoExplicacaoComparacao,
+      usaComparacaoAutomatica,
+      reporComparacaoAutomatica,
       comparacaoDisponivel,
       comparativoResumoBlocos,
       resultadosComparacao,
@@ -2069,6 +2249,7 @@ export default {
       kpisTopo,
       metasPeriodo,
       rotuloMetaPeriodo,
+      pctMetaConversao,
       alertaGlobalPlataforma,
       alertaAngariador,
       topPacotesAngariador,
@@ -2110,6 +2291,33 @@ export default {
   top: 72px;
   z-index: 20;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.stats-compare-filters {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.stats-compare-summary {
+  margin-top: 4px;
+}
+
+.stats-compare-period {
+  height: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+
+  &--actual {
+    border-left: 4px solid var(--q-primary);
+  }
+
+  &--previous {
+    border-left: 4px solid #9e9e9e;
+  }
 }
 
 .stats-compare-card {
@@ -2279,6 +2487,10 @@ export default {
   padding: 4px 0;
   border-bottom: 1px dashed #eeeeee;
 
+  &--stacked {
+    align-items: flex-start;
+  }
+
   &:last-child {
     border-bottom: none;
   }
@@ -2286,6 +2498,22 @@ export default {
   strong {
     color: #212121;
   }
+}
+
+.stats-metric-values {
+  text-align: right;
+  max-width: 62%;
+}
+
+.stats-variacao-block {
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+.stats-kpi-compare {
+  padding-top: 8px;
+  border-top: 1px dashed #e0e0e0;
+  line-height: 1.4;
 }
 
 .stats-table :deep(thead tr th) {
