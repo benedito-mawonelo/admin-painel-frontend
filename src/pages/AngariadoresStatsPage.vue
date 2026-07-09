@@ -831,7 +831,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import {
   format,
   subDays,
@@ -2012,7 +2012,21 @@ export default {
       return fallback
     }
 
+    let carregarTimer = null
+
+    function agendarCarregar(delay = 400) {
+      if (carregarTimer) clearTimeout(carregarTimer)
+      carregarTimer = setTimeout(() => {
+        carregarTimer = null
+        carregar()
+      }, delay)
+    }
+
     const carregar = async () => {
+      if (carregarTimer) {
+        clearTimeout(carregarTimer)
+        carregarTimer = null
+      }
       loading.value = true
       resultadoStatsOk.value = false
       comparacaoCarregada.value = false
@@ -2020,7 +2034,19 @@ export default {
       resultadosAnterior.value = []
 
       try {
-        const resp = await api.get('/angariadores/admin/stats/', { params: buildQueryParams() })
+        const paramsAnt = compararPeriodo.value ? buildQueryParamsAnterior() : null
+        const [mainResult, cmpResult] = await Promise.allSettled([
+          api.get('/angariadores/admin/stats/', { params: buildQueryParams() }),
+          paramsAnt
+            ? api.get('/angariadores/admin/stats/', { params: paramsAnt })
+            : Promise.resolve(null),
+        ])
+
+        if (mainResult.status === 'rejected') {
+          throw mainResult.reason
+        }
+
+        const resp = mainResult.value
         const body = resp.data || {}
         resumo.value = body.resumo || {}
         const tp = body.totais_plataforma || body.totaisPlataforma || {}
@@ -2047,30 +2073,27 @@ export default {
         mesNome.value = body.mes_nome || ''
 
         if (compararPeriodo.value) {
-          const paramsAnt = buildQueryParamsAnterior()
           if (!paramsAnt) {
             $q.notify({
               type: 'warning',
               message: 'Datas de comparação inválidas. Ajuste o intervalo ou repor datas automáticas.',
             })
+          } else if (cmpResult.status === 'fulfilled' && cmpResult.value) {
+            const bodyAnt = cmpResult.value.data || {}
+            resumoAnterior.value = bodyAnt.resumo || {}
+            resultadosAnterior.value = deduplicarResultados(bodyAnt.resultados || [])
+            comparacaoCarregada.value = true
           } else {
-            try {
-              const respAnt = await api.get('/angariadores/admin/stats/', { params: paramsAnt })
-              const bodyAnt = respAnt.data || {}
-              resumoAnterior.value = bodyAnt.resumo || {}
-              resultadosAnterior.value = deduplicarResultados(bodyAnt.resultados || [])
-              comparacaoCarregada.value = true
-            } catch (errCmp) {
-              $q.notify({
-                type: 'warning',
-                message: mensagemErroStats(errCmp, 'Período de comparação indisponível'),
-              })
-            }
+            const errCmp = cmpResult.status === 'rejected' ? cmpResult.reason : null
+            $q.notify({
+              type: 'warning',
+              message: mensagemErroStats(errCmp, 'Período de comparação indisponível'),
+            })
           }
         }
 
-        await carregarChamadasRegistadas()
         resultadoStatsOk.value = true
+        carregarChamadasRegistadas()
       } catch (err) {
         $q.notify({
           type: 'negative',
@@ -2168,21 +2191,25 @@ export default {
 
     watch(periodo, () => {
       syncComparacaoDefault()
-      carregar()
+      agendarCarregar()
     })
 
     watch([mes, ano, dataDiaPicker, dataSemanaPicker], () => {
       syncComparacaoDefault()
-      if (!loading.value) carregar()
+      if (!loading.value) agendarCarregar()
     })
 
     watch([dataComparacaoInicio, dataComparacaoFim, compararPeriodo], () => {
-      if (!loading.value) carregar()
+      if (!loading.value) agendarCarregar(500)
     })
 
     onMounted(() => {
       syncComparacaoDefault()
       carregar()
+    })
+
+    onBeforeUnmount(() => {
+      if (carregarTimer) clearTimeout(carregarTimer)
     })
 
     return {
