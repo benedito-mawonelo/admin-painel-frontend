@@ -259,6 +259,12 @@
           :columns="atendimentosColumns"
           row-key="id"
           :loading="loadingAtendimentos || syncingPagamentos"
+          flat
+          bordered
+          :pagination="{ rowsPerPage: 25 }"
+          class="sticky-header-table"
+        >
+          <template v-slot:body-cell-contactado_em="props">
             <q-td :props="props">{{ formatDateTime(props.row.contactado_em) }}</q-td>
           </template>
           <template v-slot:body-cell-feedback="props">
