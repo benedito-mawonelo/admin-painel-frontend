@@ -1708,9 +1708,6 @@ export default {
       formEditAtendimento.value = formFromAtendimentoRow(row)
       resetPagamentoBuscaEdit()
       dialogEditarAtendimento.value = true
-      if (!row.numero_pagamento && row.target_user_telefone) {
-        buscarPagamentoParaAtendimento('edit')
-      }
     }
 
     function openEditarAtendimentoFromDetalhe() {
