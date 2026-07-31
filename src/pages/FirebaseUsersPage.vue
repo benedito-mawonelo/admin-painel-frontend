@@ -5,7 +5,7 @@
         <div class="text-h5 text-weight-bold q-mb-md">Utilizadores Firebase</div>
         <p class="text-body2 text-grey-7 q-mb-md">
           Lista de utilizadores que existem no Firebase e ainda não existem no Django.
-          A primeira leitura (ou «Atualizar do Firebase») pode demorar; depois a lista fica em cache ~10 min e filtrar/mudar de página fica rápido.
+          A lista abre rápido a partir da base local. Use «Atualizar do Firebase» só quando quiser sincronizar (isso pode demorar).
         </p>
 
         <div class="row items-end q-gutter-md wrap">
@@ -61,7 +61,7 @@
           :disable="loading && !refreshing"
           @click="forceRefreshFromFirebase"
         >
-          <q-tooltip>Força nova leitura da coleção Firestore (pode demorar)</q-tooltip>
+          <q-tooltip>Sincroniza a coleção Firestore para a base local (pode demorar; depois a lista fica rápida)</q-tooltip>
         </q-btn>
         <q-btn
           flat
@@ -72,7 +72,7 @@
           :disable="loading && refreshing"
           @click="loadRows()"
         >
-          <q-tooltip>Recarregar (usa cache se disponível)</q-tooltip>
+          <q-tooltip>Recarregar lista local (rápido)</q-tooltip>
         </q-btn>
       </q-card-section>
       <q-separator />
@@ -414,11 +414,20 @@ export default {
         cacheHint.value = ''
         return
       }
-      if (data.from_cache) {
-        const when = data.cached_at ? formatDate(data.cached_at) : 'há pouco'
-        cacheHint.value = `Em cache (desde ${when}). Filtrar/páginas é rápido.`
+      if (data.needs_sync) {
+        cacheHint.value = 'Ainda não há snapshot local. Clique em «Atualizar do Firebase» uma vez.'
+        return
+      }
+      if (data.from_cache || data.from_local_db) {
+        const when = data.cached_at ? formatDate(data.cached_at) : null
+        cacheHint.value = when
+          ? `Snapshot local (sincronizado em ${when}). Abrir/filtrar é rápido.`
+          : 'Snapshot local. Abrir/filtrar é rápido.'
       } else {
-        cacheHint.value = 'Lista lida do Firebase agora e guardada em cache (~10 min).'
+        const n = data.synced_count
+        cacheHint.value = typeof n === 'number'
+          ? `Sincronizado do Firebase: ${n} pendente(s).`
+          : 'Sincronizado do Firebase.'
       }
     }
 
@@ -438,6 +447,19 @@ export default {
         rows.value = Array.isArray(data?.results) ? data.results : []
         pagination.value.rowsNumber = Number(data?.total || 0)
         formatCacheHint(data)
+        if (refresh && typeof data?.synced_count === 'number') {
+          $q.notify({
+            type: 'positive',
+            message: `Sincronização concluída: ${data.synced_count} utilizador(es) pendente(s).`,
+            timeout: 4000,
+          })
+        } else if (!refresh && data?.needs_sync) {
+          $q.notify({
+            type: 'info',
+            message: 'Clique em «Atualizar do Firebase» para carregar a lista (só precisa uma vez).',
+            timeout: 5000,
+          })
+        }
       } catch (err) {
         rows.value = []
         pagination.value.rowsNumber = 0
