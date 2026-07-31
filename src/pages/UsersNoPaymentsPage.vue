@@ -6,6 +6,9 @@
         <p class="text-body2 text-grey-7 q-mb-md">
           Lista de utilizadores registados que ainda não têm nenhum pagamento associado. Use os filtros por data para limitar ao período de registo.
         </p>
+        <p v-if="viewMode === 'registos'" class="text-body2 text-grey-7 q-mb-md">
+          Ao carregar os registos, atendimentos sem nº de pagamento são preenchidos automaticamente se o cliente já tiver pago com sucesso no gateway (M-Pesa / eMola) com o telefone de cadastro.
+        </p>
 
         <div v-if="viewMode === 'leads'" class="row items-end q-gutter-md wrap">
           <q-input
@@ -1232,7 +1235,17 @@ export default {
         if (filtroAtendTelefone.value) params.set('telefone', filtroAtendTelefone.value.trim())
         if (filtroAtendOnlyMine.value) params.set('only_mine', '1')
         const response = await api.get(`/atendimentos/?${params.toString()}`)
-        atendimentosRows.value = Array.isArray(response.data) ? response.data : []
+        const data = response.data
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : [])
+        atendimentosRows.value = list
+        const synced = Number(data?.pagamentos_synced || 0)
+        if (synced > 0) {
+          $q.notify({
+            type: 'positive',
+            message: `${synced} atendimento(s) actualizado(s) com pagamento encontrado no gateway (cliente pagou sozinho).`,
+            timeout: 4500,
+          })
+        }
       } catch (err) {
         console.error('Erro ao carregar atendimentos:', err)
         atendimentosRows.value = []
@@ -1630,7 +1643,7 @@ export default {
 
       savingAtendimento.value = true
       try {
-        await api.post(`/users/${userId}/atendimentos/`, {
+        const { data } = await api.post(`/users/${userId}/atendimentos/`, {
           contactado_em,
           feedback: formAtendimento.value.feedback,
           persona: formAtendimento.value.persona,
@@ -1643,7 +1656,16 @@ export default {
           como_soube: formAtendimento.value.como_soube || '',
           observacoes: formAtendimento.value.observacoes || '',
         })
-        $q.notify({ type: 'positive', message: 'Atendimento registado com sucesso.' })
+        const autoFilled =
+          data?.numero_pagamento &&
+          !String(formAtendimento.value.numero_pagamento || '').trim()
+        $q.notify({
+          type: 'positive',
+          message: autoFilled
+            ? `Atendimento registado. Pagamento ${data.numero_pagamento} preenchido automaticamente (gateway).`
+            : 'Atendimento registado com sucesso.',
+          timeout: autoFilled ? 5000 : 2500,
+        })
         closeRegistarAtendimento()
         if (viewMode.value === 'registos') {
           await loadAtendimentos()
