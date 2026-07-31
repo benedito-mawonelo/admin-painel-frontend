@@ -7,7 +7,7 @@
           Lista de utilizadores registados que ainda não têm nenhum pagamento associado. Use os filtros por data para limitar ao período de registo.
         </p>
         <p v-if="viewMode === 'registos'" class="text-body2 text-grey-7 q-mb-md">
-          Ao carregar os registos, atendimentos sem nº de pagamento são preenchidos automaticamente se o cliente já tiver pago com sucesso no gateway (M-Pesa / eMola) com o telefone de cadastro.
+          A lista carrega rápido. Use <strong>Actualizar pagamentos</strong> para preencher automaticamente o nº de pagamento nos atendimentos em que o cliente já pagou sozinho no gateway (telefone de cadastro).
         </p>
 
         <div v-if="viewMode === 'leads'" class="row items-end q-gutter-md wrap">
@@ -138,12 +138,24 @@
         </template>
         <template v-else>
           <q-btn
+            color="primary"
+            icon="payments"
+            label="Actualizar pagamentos"
+            no-caps
+            unelevated
+            :loading="syncingPagamentos"
+            :disable="loadingAtendimentos"
+            @click="syncPagamentosAtendimentos"
+          >
+            <q-tooltip>Procura no gateway e preenche nº de pagamento em atendimentos ainda vazios</q-tooltip>
+          </q-btn>
+          <q-btn
             outline
             color="secondary"
             icon="download"
             label="Exportar CSV"
             no-caps
-            :disable="loadingAtendimentos || !atendimentosRows.length"
+            :disable="loadingAtendimentos || syncingPagamentos || !atendimentosRows.length"
             @click="exportarAtendimentosCsv"
           />
           <q-btn
@@ -154,7 +166,7 @@
             no-caps
             @click="viewMode = 'leads'"
           />
-          <q-btn flat round dense icon="refresh" :loading="loadingAtendimentos" @click="loadAtendimentos">
+          <q-btn flat round dense icon="refresh" :loading="loadingAtendimentos" :disable="syncingPagamentos" @click="loadAtendimentos">
             <q-tooltip>Atualizar registos</q-tooltip>
           </q-btn>
         </template>
@@ -246,13 +258,7 @@
           :rows="atendimentosRows"
           :columns="atendimentosColumns"
           row-key="id"
-          :loading="loadingAtendimentos"
-          flat
-          bordered
-          :pagination="{ rowsPerPage: 25 }"
-          class="sticky-header-table"
-        >
-          <template v-slot:body-cell-contactado_em="props">
+          :loading="loadingAtendimentos || syncingPagamentos"
             <q-td :props="props">{{ formatDateTime(props.row.contactado_em) }}</q-td>
           </template>
           <template v-slot:body-cell-feedback="props">
@@ -1121,6 +1127,7 @@ export default {
     const pagamentoSelecionadoEditKey = ref(null)
 
     const loadingAtendimentos = ref(false)
+    const syncingPagamentos = ref(false)
     const atendimentosRows = ref([])
     const filtroAtendDateFrom = ref('')
     const filtroAtendDateTo = ref('')
@@ -1224,8 +1231,12 @@ export default {
       }
     }
 
-    async function loadAtendimentos() {
-      loadingAtendimentos.value = true
+    async function loadAtendimentos({ syncPagamentos = false } = {}) {
+      if (syncPagamentos) {
+        syncingPagamentos.value = true
+      } else {
+        loadingAtendimentos.value = true
+      }
       try {
         const params = new URLSearchParams()
         if (filtroAtendDateFrom.value) params.set('date_from', filtroAtendDateFrom.value)
@@ -1234,28 +1245,42 @@ export default {
         if (filtroAtendPersona.value) params.set('persona', filtroAtendPersona.value)
         if (filtroAtendTelefone.value) params.set('telefone', filtroAtendTelefone.value.trim())
         if (filtroAtendOnlyMine.value) params.set('only_mine', '1')
+        if (syncPagamentos) params.set('sync_pagamentos', '1')
         const response = await api.get(`/atendimentos/?${params.toString()}`)
         const data = response.data
         const list = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : [])
         atendimentosRows.value = list
-        const synced = Number(data?.pagamentos_synced || 0)
-        if (synced > 0) {
-          $q.notify({
-            type: 'positive',
-            message: `${synced} atendimento(s) actualizado(s) com pagamento encontrado no gateway (cliente pagou sozinho).`,
-            timeout: 4500,
-          })
+        if (syncPagamentos) {
+          const synced = Number(data?.pagamentos_synced || 0)
+          if (synced > 0) {
+            $q.notify({
+              type: 'positive',
+              message: `${synced} atendimento(s) actualizado(s) com pagamento do gateway.`,
+              timeout: 4500,
+            })
+          } else {
+            $q.notify({
+              type: 'info',
+              message: 'Nenhum atendimento sem pagamento encontrado no gateway para estes filtros.',
+              timeout: 3500,
+            })
+          }
         }
       } catch (err) {
         console.error('Erro ao carregar atendimentos:', err)
-        atendimentosRows.value = []
+        if (!syncPagamentos) atendimentosRows.value = []
         $q.notify({
           type: 'negative',
           message: err.response?.data?.error || err.response?.data?.detail || 'Erro ao carregar registos',
         })
       } finally {
         loadingAtendimentos.value = false
+        syncingPagamentos.value = false
       }
+    }
+
+    function syncPagamentosAtendimentos() {
+      return loadAtendimentos({ syncPagamentos: true })
     }
 
     const csvEscape = (value) => {
@@ -1853,6 +1878,7 @@ export default {
       filterUsersForAtendimento,
       guardarAtendimento,
       loadingAtendimentos,
+      syncingPagamentos,
       atendimentosRows,
       atendimentosColumns,
       filtroAtendDateFrom,
@@ -1862,6 +1888,7 @@ export default {
       filtroAtendTelefone,
       filtroAtendOnlyMine,
       loadAtendimentos,
+      syncPagamentosAtendimentos,
       exportarAtendimentosCsv,
       showRegistos,
       dialogDetalheAtendimento,
