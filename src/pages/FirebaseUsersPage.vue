@@ -418,17 +418,25 @@ export default {
         cacheHint.value = 'Ainda não há snapshot local. Clique em «Atualizar do Firebase» uma vez.'
         return
       }
-      if (data.from_cache || data.from_local_db) {
+      if (data.from_cache) {
         const when = data.cached_at ? formatDate(data.cached_at) : null
         cacheHint.value = when
           ? `Snapshot local (sincronizado em ${when}). Abrir/filtrar é rápido.`
           : 'Snapshot local. Abrir/filtrar é rápido.'
-      } else {
-        const n = data.synced_count
-        cacheHint.value = typeof n === 'number'
-          ? `Sincronizado do Firebase: ${n} pendente(s).`
-          : 'Sincronizado do Firebase.'
+        return
       }
+      if (data.sync_quota_exceeded) {
+        cacheHint.value = `Quota do Firebase esgotada. Lidos ${data.sync_processed || 0} documento(s); continue mais tarde.`
+        return
+      }
+      if (data.sync_completed === false) {
+        cacheHint.value = `Sincronização parcial (${data.sync_processed || 0} lidos). Clique novamente para continuar.`
+        return
+      }
+      const n = data.synced_count
+      cacheHint.value = typeof n === 'number'
+        ? `Sincronizado do Firebase: ${n} pendente(s).`
+        : 'Sincronizado do Firebase.'
     }
 
     async function loadRows({ refresh = false } = {}) {
@@ -447,7 +455,19 @@ export default {
         rows.value = Array.isArray(data?.results) ? data.results : []
         pagination.value.rowsNumber = Number(data?.total || 0)
         formatCacheHint(data)
-        if (refresh && typeof data?.synced_count === 'number') {
+        if (refresh && data?.sync_quota_exceeded) {
+          $q.notify({
+            type: 'warning',
+            message: `Quota diária do Firebase esgotada. Foram lidos ${data.sync_processed || 0} documentos e o progresso ficou guardado. Continue mais tarde.`,
+            timeout: 7000,
+          })
+        } else if (refresh && data?.sync_completed === false) {
+          $q.notify({
+            type: 'info',
+            message: `Sincronização parcial: ${data.sync_processed || 0} lidos. Clique outra vez em «Atualizar do Firebase» para continuar.`,
+            timeout: 6000,
+          })
+        } else if (refresh && typeof data?.synced_count === 'number') {
           $q.notify({
             type: 'positive',
             message: `Sincronização concluída: ${data.synced_count} utilizador(es) pendente(s).`,
