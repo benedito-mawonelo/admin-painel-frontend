@@ -115,6 +115,17 @@
           </template>
         </div>
         <q-space />
+        <q-btn
+          outline
+          color="secondary"
+          icon="auto_awesome"
+          label="Relatório IA"
+          no-caps
+          :loading="aiReportLoading"
+          @click="gerarRelatorioIa"
+        >
+          <q-tooltip>Gera um resumo com IA com base nos filtros actuais</q-tooltip>
+        </q-btn>
         <template v-if="viewMode === 'leads'">
           <q-btn
             color="primary"
@@ -946,11 +957,61 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="aiReportDialog" maximized>
+      <q-card class="column full-height">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">
+            <q-icon name="auto_awesome" color="secondary" class="q-mr-sm" />
+            Relatório IA — utilizadores sem pagamento
+          </div>
+          <q-space />
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section v-if="aiReportMeta" class="q-pt-sm text-caption text-grey-7">
+          Âmbito: {{ aiReportScopeLabel }}
+          <span v-if="aiReportMeta.leads_total != null"> · Leads sem pagamento: {{ aiReportMeta.leads_total }}</span>
+          <span v-if="aiReportMeta.atendimentos_total != null"> · Atendimentos: {{ aiReportMeta.atendimentos_total }}</span>
+          · Modelo: {{ aiReportMeta.model }}
+          <span v-if="aiReportPeriodLabel"> · {{ aiReportPeriodLabel }}</span>
+        </q-card-section>
+        <q-separator />
+        <q-card-section class="col scroll">
+          <div v-if="aiReportLoading" class="column items-center q-pa-xl">
+            <q-spinner color="secondary" size="48px" />
+            <div class="q-mt-md text-grey-7">A analisar dados e gerar relatório…</div>
+          </div>
+          <div v-else-if="aiReportError" class="text-negative q-pa-md">{{ aiReportError }}</div>
+          <pre v-else class="ai-report-body">{{ aiReportText }}</pre>
+        </q-card-section>
+        <q-separator />
+        <q-card-actions align="right" class="q-pa-md">
+          <q-btn
+            flat
+            icon="content_copy"
+            label="Copiar"
+            no-caps
+            :disable="!aiReportText"
+            @click="copiarRelatorioIa"
+          />
+          <q-btn
+            outline
+            color="secondary"
+            icon="refresh"
+            label="Gerar novamente"
+            no-caps
+            :loading="aiReportLoading"
+            @click="gerarRelatorioIa"
+          />
+          <q-btn unelevated color="primary" label="Fechar" no-caps v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api } from 'boot/axios'
@@ -1151,7 +1212,27 @@ export default {
     const formEditAtendimento = ref(formFromAtendimentoRow({}))
     const savingEditAtendimento = ref(false)
 
+    const aiReportDialog = ref(false)
+    const aiReportLoading = ref(false)
+    const aiReportText = ref('')
+    const aiReportError = ref('')
+    const aiReportMeta = ref(null)
+
     let refreshTimer = null
+
+    const aiReportScopeLabel = computed(() => {
+      const scope = aiReportMeta.value?.scope
+      if (scope === 'leads') return 'Leads sem pagamento'
+      if (scope === 'atendimentos') return 'Atendimentos'
+      if (scope === 'both') return 'Leads + atendimentos'
+      return scope || '—'
+    })
+
+    const aiReportPeriodLabel = computed(() => {
+      const f = aiReportMeta.value?.filters || {}
+      if (!f.date_from && !f.date_to) return ''
+      return `Período: ${f.date_from || '…'} → ${f.date_to || '…'}`
+    })
 
     function formatDate(val) {
       if (!val) return '—'
@@ -1792,6 +1873,56 @@ export default {
       loadAtendimentos()
     }
 
+    async function gerarRelatorioIa() {
+      aiReportDialog.value = true
+      aiReportLoading.value = true
+      aiReportError.value = ''
+      aiReportText.value = ''
+      aiReportMeta.value = null
+
+      const scope = viewMode.value === 'registos' ? 'atendimentos' : 'leads'
+      const payload = { scope }
+
+      if (scope === 'leads') {
+        if (dateFrom.value) payload.date_from = dateFrom.value
+        if (dateTo.value) payload.date_to = dateTo.value
+      } else {
+        if (filtroAtendDateFrom.value) payload.date_from = filtroAtendDateFrom.value
+        if (filtroAtendDateTo.value) payload.date_to = filtroAtendDateTo.value
+        if (filtroAtendFeedback.value) payload.feedback = filtroAtendFeedback.value
+        if (filtroAtendPersona.value) payload.persona = filtroAtendPersona.value
+        if (filtroAtendTelefone.value) payload.telefone = filtroAtendTelefone.value.trim()
+        if (filtroAtendOnlyMine.value) payload.only_mine = true
+      }
+
+      try {
+        const { data } = await api.post('/users/no-payments/ai-report/', payload)
+        aiReportText.value = data.report || ''
+        aiReportMeta.value = data.meta || null
+        if (!aiReportText.value) {
+          aiReportError.value = 'A IA não devolveu texto. Tente novamente.'
+        }
+      } catch (err) {
+        const msg =
+          err.response?.data?.error ||
+          err.response?.data?.detail ||
+          'Erro ao gerar relatório IA'
+        aiReportError.value = typeof msg === 'string' ? msg : 'Erro ao gerar relatório IA'
+      } finally {
+        aiReportLoading.value = false
+      }
+    }
+
+    async function copiarRelatorioIa() {
+      if (!aiReportText.value) return
+      try {
+        await navigator.clipboard.writeText(aiReportText.value)
+        $q.notify({ type: 'positive', message: 'Relatório copiado' })
+      } catch {
+        $q.notify({ type: 'warning', message: 'Não foi possível copiar' })
+      }
+    }
+
     function openDetalheAtendimento(row) {
       atendimentoDetalhe.value = row
       dialogDetalheAtendimento.value = true
@@ -1805,6 +1936,8 @@ export default {
         savingAtendimento.value ||
         dialogEditarAtendimento.value ||
         savingEditAtendimento.value ||
+        aiReportDialog.value ||
+        aiReportLoading.value ||
         viewMode.value !== 'leads'
       )
     }
@@ -1905,6 +2038,15 @@ export default {
       openEditarAtendimentoFromDetalhe,
       closeEditarAtendimento,
       guardarEdicaoAtendimento,
+      aiReportDialog,
+      aiReportLoading,
+      aiReportText,
+      aiReportError,
+      aiReportMeta,
+      aiReportScopeLabel,
+      aiReportPeriodLabel,
+      gerarRelatorioIa,
+      copiarRelatorioIa,
     }
   },
 }
@@ -2033,5 +2175,15 @@ export default {
 
 .body--dark .atendimento-dialog-actions {
   background: #2d2d2d;
+}
+
+.ai-report-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  margin: 0;
+  padding: 8px 4px;
 }
 </style>
