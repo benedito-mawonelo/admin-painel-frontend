@@ -2,11 +2,38 @@
   <q-page class="q-pa-md">
     <q-card class="q-mb-md">
       <q-card-section>
-        <div class="text-h5 text-weight-bold q-mb-md">Pagamentos falhados</div>
+        <div class="row items-center q-mb-md">
+          <div class="text-h5 text-weight-bold">
+            {{ viewMode === 'history' ? 'Histórico de pagamentos falhados' : 'Pagamentos falhados' }}
+          </div>
+          <q-space />
+          <q-btn
+            v-if="viewMode === 'active'"
+            color="secondary"
+            outline
+            icon="history"
+            label="Ver histórico (já com pagamento ativo)"
+            @click="switchView('history')"
+          />
+          <q-btn
+            v-else
+            color="primary"
+            outline
+            icon="list"
+            label="Voltar à lista activa"
+            @click="switchView('active')"
+          />
+        </div>
         <p class="text-body2 text-grey-7 q-mb-md">
-          Tentativas de pagamento que <strong>falharam</strong> na base <strong>external_db</strong> (M-Pesa / E-Mola). Cada número aparece só uma vez (tentativa mais recente). Pode marcar assistência ao cliente.
+          <template v-if="viewMode === 'active'">
+            Tentativas de pagamento que <strong>falharam</strong> na base <strong>external_db</strong> (M-Pesa / E-Mola).
+            Cada número aparece só uma vez (tentativa mais recente). Quem já tem pagamento ativo na app é retirado desta lista e guardado no histórico.
+          </template>
+          <template v-else>
+            Falhas de clientes que <strong>já têm pagamento ativo</strong> na app. Guardadas para análises futuras (não precisam de assistência urgente).
+          </template>
         </p>
-        <q-banner rounded class="bg-teal-1 text-dark q-mb-md">
+        <q-banner v-if="viewMode === 'active'" rounded class="bg-teal-1 text-dark q-mb-md">
           <template v-slot:avatar>
             <q-icon name="payments" color="primary" />
           </template>
@@ -54,7 +81,11 @@
 
     <q-card>
       <q-card-section class="row items-center">
-        <div class="text-h6">Resultados ({{ rows.length }} tentativas falhadas)</div>
+        <div class="text-h6">
+          {{ viewMode === 'history'
+            ? `Histórico (${rows.length} com pagamento ativo)`
+            : `Resultados (${rows.length} tentativas falhadas)` }}
+        </div>
         <q-space />
         <q-btn flat round dense icon="refresh" :loading="loading" @click="loadFailed">
           <q-tooltip>Atualizar lista</q-tooltip>
@@ -64,7 +95,7 @@
       <q-card-section class="q-pa-none">
         <q-table
           :rows="rows"
-          :columns="columns"
+          :columns="activeColumns"
           row-key="rowId"
           :loading="loading"
           flat
@@ -72,23 +103,32 @@
           :rows-per-page-options="[10, 25, 50]"
           class="sticky-header-table"
         >
-        <template v-slot:body-cell-account_name="props">
-        <q-td :props="props">
-          <span v-if="props.row.account_name" class="text-weight-medium">
-            {{ props.row.account_name }}
-          </span>
-          <span v-else class="text-grey-5">—</span>
-        </q-td>
-      </template>
+          <template v-slot:body-cell-account_name="props">
+            <q-td :props="props">
+              <span v-if="props.row.account_name || props.row.user_name" class="text-weight-medium">
+                {{ props.row.account_name || props.row.user_name }}
+              </span>
+              <span v-else class="text-grey-5">—</span>
+            </q-td>
+          </template>
 
-      <template v-slot:body-cell-account_phone="props">
-        <q-td :props="props">
-          <span v-if="props.row.account_phone">{{ props.row.account_phone }}</span>
-          <span v-else class="text-grey-5">—</span>
-        </q-td>
-      </template>
+          <template v-slot:body-cell-account_phone="props">
+            <q-td :props="props">
+              <span v-if="props.row.account_phone">{{ props.row.account_phone }}</span>
+              <span v-else class="text-grey-5">—</span>
+            </q-td>
+          </template>
           <template v-slot:body-cell-created_at="props">
             <q-td :props="props">{{ formatDate(props.row.created_at) }}</q-td>
+          </template>
+          <template v-slot:body-cell-archived_at="props">
+            <q-td :props="props">{{ formatDate(props.row.archived_at) }}</q-td>
+          </template>
+          <template v-slot:body-cell-active_end_at="props">
+            <q-td :props="props">{{ formatDate(props.row.active_end_at) }}</q-td>
+          </template>
+          <template v-slot:body-cell-active_category="props">
+            <q-td :props="props">{{ formatCategory(props.row.active_category) }}</q-td>
           </template>
           <template v-slot:body-cell-failure_reason="props">
             <q-td :props="props">
@@ -138,7 +178,9 @@
           <template v-slot:no-data>
             <div class="full-width row flex-center text-grey-7 q-pa-lg">
               <q-icon name="info" size="2rem" class="q-mr-sm" />
-              Nenhuma tentativa de pagamento falhada no período selecionado (ou base external_db indisponível).
+              {{ viewMode === 'history'
+                ? 'Nenhum pagamento falhado arquivado no período (ou ainda ninguém com falha passou a ter pagamento ativo).'
+                : 'Nenhuma tentativa de pagamento falhada no período selecionado (ou base external_db indisponível).' }}
             </div>
           </template>
         </q-table>
@@ -148,30 +190,45 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import { api } from 'boot/axios'
 
-// const columns = [
-//   { name: 'phone_number', label: 'Telefone', field: 'phone_number', align: 'left', sortable: true },
-//   { name: 'amount', label: 'Valor (MT)', field: 'amount', align: 'right', sortable: true },
-//   { name: 'payment_method', label: 'Método', field: 'payment_method', align: 'left' },
-//   { name: 'created_at', label: 'Data da tentativa', field: 'created_at', align: 'left', sortable: true },
-//   { name: 'failure_reason', label: 'Motivo da falha', field: 'failure_reason', align: 'left' },
-//   { name: 'assistencia', label: 'Assistência', field: 'assisted_by_name', align: 'left' },
-// ]
-const columns = [
-  { name: 'account_name',   label: 'Nome da conta',     field: 'account_name',   align: 'left', sortable: true },
-  { name: 'account_phone',  label: 'Nº da conta',       field: 'account_phone',  align: 'left' },
-  { name: 'phone_number',   label: 'Telefone pagamento', field: 'phone_number',  align: 'left', sortable: true },
-  { name: 'amount',         label: 'Valor (MT)',         field: 'amount',         align: 'right', sortable: true },
-  { name: 'payment_method', label: 'Método',             field: 'payment_method', align: 'left' },
-  { name: 'created_at',     label: 'Data da tentativa',  field: 'created_at',     align: 'left', sortable: true },
-  { name: 'failure_reason', label: 'Motivo da falha',    field: 'failure_reason', align: 'left' },
-  { name: 'assistencia',    label: 'Assistência',        field: 'assisted_by_name', align: 'left' },
-  { name: 'vincular',       label: 'Pagamento OK?',      field: 'vincular', align: 'center' },
+const columnsActive = [
+  { name: 'account_name', label: 'Nome da conta', field: 'account_name', align: 'left', sortable: true },
+  { name: 'account_phone', label: 'Nº da conta', field: 'account_phone', align: 'left' },
+  { name: 'phone_number', label: 'Telefone pagamento', field: 'phone_number', align: 'left', sortable: true },
+  { name: 'amount', label: 'Valor (MT)', field: 'amount', align: 'right', sortable: true },
+  { name: 'payment_method', label: 'Método', field: 'payment_method', align: 'left' },
+  { name: 'created_at', label: 'Data da tentativa', field: 'created_at', align: 'left', sortable: true },
+  { name: 'failure_reason', label: 'Motivo da falha', field: 'failure_reason', align: 'left' },
+  { name: 'assistencia', label: 'Assistência', field: 'assisted_by_name', align: 'left' },
+  { name: 'vincular', label: 'Pagamento OK?', field: 'vincular', align: 'center' },
 ]
+
+const columnsHistory = [
+  { name: 'account_name', label: 'Nome da conta', field: 'account_name', align: 'left', sortable: true },
+  { name: 'account_phone', label: 'Nº da conta', field: 'account_phone', align: 'left' },
+  { name: 'phone_number', label: 'Telefone pagamento', field: 'phone_number', align: 'left', sortable: true },
+  { name: 'amount', label: 'Valor (MT)', field: 'amount', align: 'right', sortable: true },
+  { name: 'payment_method', label: 'Método', field: 'payment_method', align: 'left' },
+  { name: 'created_at', label: 'Data da falha', field: 'created_at', align: 'left', sortable: true },
+  { name: 'failure_reason', label: 'Motivo da falha', field: 'failure_reason', align: 'left' },
+  { name: 'active_category', label: 'Plano ativo', field: 'active_category', align: 'left' },
+  { name: 'active_end_at', label: 'Válido até', field: 'active_end_at', align: 'left', sortable: true },
+  { name: 'archived_at', label: 'Arquivado em', field: 'archived_at', align: 'left', sortable: true },
+]
+
+const CATEGORY_LABELS = {
+  profissional: 'Profissional',
+  ligeiro_pesado: 'Ligeiro/Pesado',
+  'ganha-facil': 'Ganha-Fácil',
+  'video-pratical': 'Vídeo Prático',
+  videos: 'Vídeos',
+  'videos-practical-ligeiro': 'Aulas Práticas Ligeiro',
+  'videos-practical-pesado': 'Aulas Práticas Pesado',
+}
 
 export default {
   name: 'FailedPaymentsPage',
@@ -184,6 +241,11 @@ export default {
     const dateFrom = ref('')
     const dateTo = ref('')
     const assistingPhone = ref(null)
+    const viewMode = ref('active')
+
+    const activeColumns = computed(() =>
+      viewMode.value === 'history' ? columnsHistory : columnsActive
+    )
 
     function formatDate(val) {
       if (!val) return '—'
@@ -198,13 +260,19 @@ export default {
       return method || '—'
     }
 
+    function formatCategory(cat) {
+      if (!cat) return '—'
+      return CATEGORY_LABELS[cat] || cat
+    }
+
     async function loadFailed() {
       loading.value = true
       try {
         const params = new URLSearchParams()
         if (dateFrom.value) params.set('date_from', dateFrom.value)
         if (dateTo.value) params.set('date_to', dateTo.value)
-        const url = `/payments/admin/failed/${params.toString() ? '?' + params.toString() : ''}`
+        params.set('view', viewMode.value)
+        const url = `/payments/admin/failed/?${params.toString()}`
         const response = await api.get(url)
         const list = Array.isArray(response.data) ? response.data : []
         rows.value = list.map((r, i) => ({ ...r, rowId: (r.phone_number || '') + '-' + String(i) }))
@@ -218,13 +286,18 @@ export default {
       }
     }
 
+    function switchView(mode) {
+      viewMode.value = mode
+      loadFailed()
+    }
+
     function clearDates() {
       dateFrom.value = ''
       dateTo.value = ''
       loadFailed()
     }
 
-    function goVincularPagamento (row) {
+    function goVincularPagamento(row) {
       const phone = (row.phone_number || row.account_phone || '').trim()
       if (!phone) {
         $q.notify({ type: 'warning', message: 'Sem número para pesquisar nesta linha.' })
@@ -259,14 +332,17 @@ export default {
     return {
       loading,
       rows,
-      columns,
       dateFrom,
       dateTo,
       assistingPhone,
+      viewMode,
+      activeColumns,
       formatDate,
       formatPaymentMethod,
+      formatCategory,
       loadFailed,
       clearDates,
+      switchView,
       marcarAssistencia,
       goVincularPagamento,
     }
