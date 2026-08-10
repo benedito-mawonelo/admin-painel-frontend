@@ -28,6 +28,7 @@
           <template v-if="viewMode === 'active'">
             Tentativas de pagamento que <strong>falharam</strong> na base <strong>external_db</strong> (M-Pesa / E-Mola).
             Cada número aparece só uma vez (tentativa mais recente). Quem já tem pagamento ativo na app é retirado desta lista e guardado no histórico.
+            Por defeito mostra os <strong>últimos 30 dias</strong> (mais rápido).
           </template>
           <template v-else>
             Falhas de clientes que <strong>já têm pagamento ativo</strong> na app. Guardadas para análises futuras (não precisam de assistência urgente).
@@ -72,7 +73,7 @@
           />
           <q-btn
             flat
-            label="Limpar datas"
+            label="Últimos 30 dias"
             @click="clearDates"
           />
         </div>
@@ -238,10 +239,26 @@ export default {
     const router = useRouter()
     const loading = ref(false)
     const rows = ref([])
-    const dateFrom = ref('')
-    const dateTo = ref('')
     const assistingPhone = ref(null)
     const viewMode = ref('active')
+
+    function toInputDate(d) {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+
+    function defaultDateRange() {
+      const to = new Date()
+      const from = new Date()
+      from.setDate(from.getDate() - 30)
+      return { from: toInputDate(from), to: toInputDate(to) }
+    }
+
+    const initialRange = defaultDateRange()
+    const dateFrom = ref(initialRange.from)
+    const dateTo = ref(initialRange.to)
 
     const activeColumns = computed(() =>
       viewMode.value === 'history' ? columnsHistory : columnsActive
@@ -292,8 +309,9 @@ export default {
     }
 
     function clearDates() {
-      dateFrom.value = ''
-      dateTo.value = ''
+      const range = defaultDateRange()
+      dateFrom.value = range.from
+      dateTo.value = range.to
       loadFailed()
     }
 
