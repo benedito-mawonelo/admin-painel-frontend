@@ -186,6 +186,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/versoes-app" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="system_update" color="amber-4" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Versões da app</div>
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/reembolsos" class="text-white">
             <q-item-section avatar>
               <q-icon name="currency_exchange" color="light-blue-3" />
