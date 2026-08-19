@@ -195,6 +195,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/pagamentos-duplicados" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="content_copy" color="deep-orange-3" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Pagamentos duplicados</div>
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/reembolsos" class="text-white">
             <q-item-section avatar>
               <q-icon name="currency_exchange" color="light-blue-3" />
