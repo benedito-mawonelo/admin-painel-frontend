@@ -4,7 +4,8 @@
       <q-card-section>
         <div class="text-h5 text-weight-bold q-mb-sm">Pagamentos duplicados</div>
         <p class="text-body2 text-grey-7 q-mb-md">
-          Transacções <strong>com sucesso</strong> do mesmo telefone e valor num intervalo curto (possível cobrança dupla para reembolso).
+          Transacções <strong>com sucesso</strong> do mesmo telefone e valor num intervalo curto (possível cobrança dupla).
+          Os que já têm <strong>reembolso registado</strong> deixam de aparecer nesta lista.
         </p>
 
         <div class="row items-end q-gutter-md wrap">
@@ -107,11 +108,9 @@
               <span v-else class="text-grey-5">—</span>
             </q-td>
           </template>
-          <template v-slot:body-cell-status="props">
+          <template v-slot:body-cell-actions="props">
             <q-td :props="props">
-              <q-badge v-if="props.row.has_refund" color="positive" label="Reembolsado" />
               <q-btn
-                v-else
                 flat
                 dense
                 size="sm"
@@ -125,7 +124,7 @@
           <template v-slot:no-data>
             <div class="full-width row flex-center text-grey-7 q-pa-lg">
               <q-icon name="check_circle" size="2rem" class="q-mr-sm text-positive" />
-              Nenhum pagamento duplicado encontrado neste período.
+              Nenhum pagamento duplicado pendente neste período.
             </div>
           </template>
         </q-table>
@@ -148,7 +147,7 @@ const columns = [
   { name: 'second_at', label: '2.º Pagamento', field: 'second_at', align: 'left', sortable: true },
   { name: 'gap_minutes', label: 'Intervalo (min)', field: 'gap_minutes', align: 'right', sortable: true },
   { name: 'app_user', label: 'Conta na app', field: 'app_user', align: 'left' },
-  { name: 'status', label: 'Reembolso', field: 'has_refund', align: 'center' },
+  { name: 'actions', label: 'Acção', field: 'actions', align: 'center' },
 ]
 
 function toInputDate(d) {
