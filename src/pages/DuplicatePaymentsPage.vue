@@ -5,7 +5,7 @@
         <div class="text-h5 text-weight-bold q-mb-sm">Pagamentos duplicados</div>
         <p class="text-body2 text-grey-7 q-mb-md">
           Transacções <strong>com sucesso</strong> do mesmo telefone e valor num intervalo curto (possível cobrança dupla).
-          Os que já têm <strong>reembolso registado</strong> deixam de aparecer nesta lista.
+          Só aparecem os que <strong>ainda não estão na aba Reembolsos</strong>.
         </p>
 
         <div class="row items-end q-gutter-md wrap">
