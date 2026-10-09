@@ -151,7 +151,7 @@
                         <div class="row items-center q-mb-sm">
                           <div class="col-4 col-md-2 text-grey-7">Plano:</div>
                           <div class="col-8 col-md-4 text-weight-bold text-capitalize">
-                            {{ subscription.category }}
+                            {{ subscriptionLabel(subscription) }}
                           </div>
 
                           <div class="col-4 col-md-2 text-grey-7">Status:</div>
@@ -431,6 +431,40 @@
                       <div class="row q-col-gutter-md">
                         <div class="col-12 col-md-6">
                           <q-select
+                            v-model="subscription.subcategoria"
+                            outlined
+                            label="Subcategoria"
+                            :options="subcategoriaOptions"
+                            emit-value
+                            map-options
+                            clearable
+                            class="q-mb-md"
+                            @update:model-value="applySubcategoriaToSubscription(subscription)"
+                          />
+                          <q-select
+                            v-if="subscription.subcategoria && !isVideoSubcategoria(subscription.subcategoria)"
+                            v-model="subscription.plano"
+                            outlined
+                            label="Pacote"
+                            :options="planoOptions"
+                            emit-value
+                            map-options
+                            class="q-mb-md"
+                            @update:model-value="applySubcategoriaToSubscription(subscription)"
+                          />
+                          <q-select
+                            v-if="subscription.subcategoria === 'video_aulas_praticas'"
+                            v-model="subscription.practical"
+                            outlined
+                            label="Tipo de veículo"
+                            :options="practicalOptions"
+                            emit-value
+                            map-options
+                            class="q-mb-md"
+                            @update:model-value="applySubcategoriaToSubscription(subscription)"
+                          />
+                          <q-select
+                            v-if="!subscription.subcategoria"
                             v-model="subscription.category"
                             outlined
                             label="Tipo de Plano"
@@ -549,10 +583,34 @@
 
         <q-card-section class="q-pt-none">
           <q-select
-            v-model="newSubscription.category"
+            v-model="newSubscription.subcategoria"
             outlined
-            label="Tipo de Plano"
-            :options="planOptions"
+            label="Subcategoria"
+            :options="subcategoriaOptions"
+            emit-value
+            map-options
+            class="q-mb-md"
+          />
+
+          <q-select
+            v-if="newSubscription.subcategoria && !isVideoSubcategoria(newSubscription.subcategoria)"
+            v-model="newSubscription.plano"
+            outlined
+            label="Pacote"
+            :options="planoOptions"
+            emit-value
+            map-options
+            class="q-mb-md"
+          />
+
+          <q-select
+            v-if="newSubscription.subcategoria === 'video_aulas_praticas'"
+            v-model="newSubscription.practical"
+            outlined
+            label="Tipo de veículo"
+            :options="practicalOptions"
+            emit-value
+            map-options
             class="q-mb-md"
           />
 
@@ -687,6 +745,9 @@ export default {
 
     const newSubscription = ref({
       category: '',
+      subcategoria: '',
+      plano: 'basic',
+      practical: 'pesado',
       payedByNumber: '',
       startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
       endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD'),
@@ -716,6 +777,80 @@ export default {
       'ligeiro_pesado',
       'videos-practical-ligeiro',
     ]
+
+    const subcategoriaOptions = [
+      { label: 'Exame INATRO', value: 'exames_inatro' },
+      { label: 'Novos alunos', value: 'material_basico' },
+      { label: 'Preparação para os testes', value: 'preparacao' },
+      { label: 'Pré-escola', value: 'pre_escola' },
+      { label: 'Profissional', value: 'profissional' },
+      { label: 'Aulas teóricas', value: 'video_aulas' },
+      { label: 'Aulas práticas', value: 'video_aulas_praticas' },
+    ]
+
+    const planoOptions = [
+      { label: 'Pacote Básico', value: 'basic' },
+      { label: 'Ultra Pro Max', value: 'pro' },
+    ]
+
+    const practicalOptions = [
+      { label: 'Ligeiro', value: 'ligeiro' },
+      { label: 'Pesado', value: 'pesado' },
+    ]
+
+    const subcategoriaDias = {
+      exames_inatro: { basic: 20, pro: 40 },
+      material_basico: { basic: 25, pro: 50 },
+      preparacao: { basic: 30, pro: 60 },
+      pre_escola: { basic: 7, pro: 25 },
+      profissional: { basic: 25, pro: 50 },
+      video_aulas: { basic: 30, pro: 30 },
+      video_aulas_praticas: { basic: 30, pro: 30 },
+    }
+
+    const subcategoriaNomes = Object.fromEntries(
+      subcategoriaOptions.map((item) => [item.value, item.label]),
+    )
+
+    const isVideoSubcategoria = (slug) => slug === 'video_aulas' || slug === 'video_aulas_praticas'
+
+    const categoriaDoDesbloqueio = (slug, plano, practical) => {
+      const tier = plano === 'pro' ? 'pro' : 'basic'
+      if (['exames_inatro', 'material_basico', 'preparacao', 'pre_escola'].includes(slug)) {
+        return tier === 'pro' ? 'ganha-facil' : 'ligeiro_pesado'
+      }
+      if (slug === 'profissional') return tier === 'pro' ? 'ganha-facil' : 'profissional'
+      if (slug === 'video_aulas') return 'videos'
+      if (slug === 'video_aulas_praticas') {
+        return practical === 'ligeiro' ? 'videos-practical-ligeiro' : 'videos-practical-pesado'
+      }
+      return ''
+    }
+
+    const diasDoDesbloqueio = (slug, plano) => {
+      const row = subcategoriaDias[slug]
+      if (!row) return 30
+      return plano === 'pro' ? row.pro : row.basic
+    }
+
+    const applySubcategoriaToSubscription = (subscription) => {
+      if (!subscription || !subscription.subcategoria) return
+      const plano = isVideoSubcategoria(subscription.subcategoria)
+        ? 'basic'
+        : (subscription.plano || 'basic')
+      subscription.plano = plano
+      subscription.category = categoriaDoDesbloqueio(
+        subscription.subcategoria,
+        plano,
+        subscription.practical || 'pesado',
+      )
+    }
+
+    const subscriptionLabel = (subscription) => {
+      const slug = subscription && subscription.subcategoria
+      if (slug && subcategoriaNomes[slug]) return subcategoriaNomes[slug]
+      return (subscription && subscription.category) || 'Plano'
+    }
 
     const RECENT_SEARCHES_KEY = 'admin_users_recent_searches'
     const RECENT_SEARCHES_MAX = 10
@@ -792,9 +927,17 @@ export default {
 
     // Watcher para atualizar a validade quando a categoria ou data de início mudar
     watch(
-      [() => newSubscription.value.category, () => newSubscription.value.startAt],
-      ([newCategory, newStartAt]) => {
-        const defaultValidityDays = newCategory === 'ganha-facil' ? 70 : 30
+      [
+        () => newSubscription.value.subcategoria,
+        () => newSubscription.value.plano,
+        () => newSubscription.value.practical,
+        () => newSubscription.value.startAt,
+      ],
+      ([slug, plano, practical, newStartAt]) => {
+        if (!slug) return
+        const tier = isVideoSubcategoria(slug) ? 'basic' : plano
+        newSubscription.value.category = categoriaDoDesbloqueio(slug, tier, practical)
+        const defaultValidityDays = diasDoDesbloqueio(slug, tier)
         const startDate = new Date(newStartAt || Date.now())
         newSubscription.value.endAt = date.formatDate(
           startDate.getTime() + defaultValidityDays * 24 * 60 * 60 * 1000,
@@ -875,6 +1018,9 @@ export default {
       // Inicializa com validade padrão de 30 dias
       newSubscription.value = {
         category: '',
+        subcategoria: '',
+        plano: 'basic',
+        practical: 'pesado',
         payedByNumber: clientData.value.telefone,
         startAt: date.formatDate(Date.now(), 'YYYY-MM-DD'),
         endAt: date.formatDate(Date.now() + 30 * 24 * 60 * 60 * 1000, 'YYYY-MM-DD'),
@@ -891,27 +1037,32 @@ export default {
         return
       }
 
-      if (!newSubscription.value.category) {
+      if (!newSubscription.value.subcategoria) {
         $q.notify({
           type: 'warning',
-          message: 'Por favor, selecione um tipo de plano.',
+          message: 'Seleccione a subcategoria.',
         })
         return
       }
 
       try {
-        // Garante que a validade seja correta antes de salvar
-        const defaultValidityDays = newSubscription.value.category === 'ganha-facil' ? 70 : 30
+        const slug = newSubscription.value.subcategoria
+        const plano = isVideoSubcategoria(slug) ? 'basic' : newSubscription.value.plano
+        const practical = newSubscription.value.practical
+        const defaultValidityDays = diasDoDesbloqueio(slug, plano)
+        newSubscription.value.category = categoriaDoDesbloqueio(slug, plano, practical)
         newSubscription.value.endAt = date.formatDate(
           new Date(newSubscription.value.startAt).getTime() +
             defaultValidityDays * 24 * 60 * 60 * 1000,
           'YYYY-MM-DD',
         )
 
-        // Carta Fácil: criar pagamento via endpoint admin
         await api.post('/payments/admin/add/', {
           user_id: clientData.value.id,
           category: newSubscription.value.category,
+          subcategoria: slug,
+          plano,
+          practical: slug === 'video_aulas_praticas' ? practical : undefined,
           start_at: newSubscription.value.startAt,
           end_at: newSubscription.value.endAt,
           phone_number: newSubscription.value.payedByNumber || clientData.value.telefone,
@@ -952,7 +1103,17 @@ export default {
       () => editForm.value.payments,
       (newPayments) => {
         newPayments.forEach((subscription) => {
-          if (subscription.category && subscription.startAt) {
+          if (subscription.subcategoria && subscription.startAt) {
+            const plano = isVideoSubcategoria(subscription.subcategoria)
+              ? 'basic'
+              : (subscription.plano || 'basic')
+            const defaultValidityDays = diasDoDesbloqueio(subscription.subcategoria, plano)
+            const startDate = new Date(subscription.startAt)
+            subscription.endAt = date.formatDate(
+              startDate.getTime() + defaultValidityDays * 24 * 60 * 60 * 1000,
+              'YYYY-MM-DD',
+            )
+          } else if (subscription.category && subscription.startAt) {
             const defaultValidityDays = subscription.category === 'ganha-facil' ? 70 : 30
             const startDate = new Date(subscription.startAt)
             subscription.endAt = date.formatDate(
@@ -1193,6 +1354,9 @@ export default {
         for (const p of toUpdate) {
           await api.patch(`/payments/admin/${p.id}/`, {
             category: p.category,
+            subcategoria: p.subcategoria || '',
+            plano: p.plano || (p.category === 'ganha-facil' ? 'pro' : 'basic'),
+            practical: p.practical,
             start_at: p.startAt || p.start_at,
             end_at: p.endAt || p.end_at,
             phone_number: p.payedByNumber || p.phone_number || undefined,
@@ -1204,6 +1368,9 @@ export default {
             await api.post('/payments/admin/add/', {
               user_id: editForm.value.id,
               category: p.category,
+              subcategoria: p.subcategoria || undefined,
+              plano: p.plano || undefined,
+              practical: p.practical || undefined,
               start_at: p.startAt || p.start_at,
               end_at: p.endAt || p.end_at,
               phone_number: p.payedByNumber || p.phone_number || undefined,
@@ -1375,6 +1542,12 @@ export default {
       addSubscriptionDialog,
       newSubscription,
       planOptions,
+      subcategoriaOptions,
+      planoOptions,
+      practicalOptions,
+      isVideoSubcategoria,
+      subscriptionLabel,
+      applySubcategoriaToSubscription,
       genderOptions,
       provinceOptions,
       searchClient,
