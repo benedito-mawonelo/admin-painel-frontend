@@ -137,7 +137,7 @@
                       v-for="(subscription, index) in clientData.payments"
                       :key="index"
                       :name="index"
-                      :label="subscription.category || `Plano ${index + 1}`"
+                      :label="subscriptionLabel(subscription)"
                     />
                   </q-tabs>
 
@@ -408,7 +408,7 @@
                       v-for="(subscription, index) in editForm.payments"
                       :key="index"
                       :name="index"
-                      :label="subscription.category || `Plano ${index + 1}`"
+                      :label="subscriptionLabel(subscription)"
                     >
                       <q-btn
                         icon="close"
@@ -456,13 +456,25 @@
                             v-if="subscription.subcategoria === 'video_aulas_praticas'"
                             v-model="subscription.practical"
                             outlined
-                            label="Tipo de veículo"
+                            label="Categoria do veículo"
                             :options="practicalOptions"
                             emit-value
                             map-options
                             class="q-mb-md"
                             @update:model-value="applySubcategoriaToSubscription(subscription)"
                           />
+                          <div
+                            v-if="resumoDoDesbloqueio(subscription.subcategoria, subscription.plano, subscription.practical)"
+                            class="unlock-confirm q-mb-md"
+                          >
+                            <div class="text-caption">A desbloquear</div>
+                            <div class="text-weight-bold">
+                              {{ resumoDoDesbloqueio(subscription.subcategoria, subscription.plano, subscription.practical).titulo }}
+                            </div>
+                            <div>
+                              Categoria: {{ resumoDoDesbloqueio(subscription.subcategoria, subscription.plano, subscription.practical).categoria }}
+                            </div>
+                          </div>
                           <q-select
                             v-if="!subscription.subcategoria"
                             v-model="subscription.category"
@@ -607,12 +619,18 @@
             v-if="newSubscription.subcategoria === 'video_aulas_praticas'"
             v-model="newSubscription.practical"
             outlined
-            label="Tipo de veículo"
+            label="Categoria do veículo"
             :options="practicalOptions"
             emit-value
             map-options
             class="q-mb-md"
           />
+
+          <div v-if="resumoNovaAssinatura" class="unlock-confirm q-mb-md">
+            <div class="text-caption">A desbloquear</div>
+            <div class="text-weight-bold">{{ resumoNovaAssinatura.titulo }}</div>
+            <div>Categoria: {{ resumoNovaAssinatura.categoria }}</div>
+          </div>
 
           <q-input
             v-model="newSubscription.payedByNumber"
@@ -709,7 +727,7 @@
 </template>
 
 <script>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from 'boot/axios'
 import { useQuasar } from 'quasar'
@@ -812,6 +830,15 @@ export default {
       subcategoriaOptions.map((item) => [item.value, item.label]),
     )
 
+    const categoriaNomes = {
+      ligeiro_pesado: 'Ligeiro e Pesado',
+      'ganha-facil': 'Ultra Pro Max',
+      profissional: 'Profissional',
+      videos: 'Vídeo-aulas teóricas',
+      'videos-practical-ligeiro': 'Vídeo-aulas práticas · Ligeiro',
+      'videos-practical-pesado': 'Vídeo-aulas práticas · Pesado',
+    }
+
     const isVideoSubcategoria = (slug) => slug === 'video_aulas' || slug === 'video_aulas_praticas'
 
     const categoriaDoDesbloqueio = (slug, plano, practical) => {
@@ -846,10 +873,44 @@ export default {
       )
     }
 
+    const veiculoDaAssinatura = (practical, category) => {
+      if (practical === 'ligeiro' || category === 'videos-practical-ligeiro') return 'ligeiro'
+      if (practical === 'pesado' || category === 'videos-practical-pesado') return 'pesado'
+      return practical || ''
+    }
+
+    const resumoDoDesbloqueio = (slug, plano, practical) => {
+      if (!slug || !subcategoriaNomes[slug]) return null
+      const nome = subcategoriaNomes[slug]
+      const tier = isVideoSubcategoria(slug) ? 'basic' : (plano || 'basic')
+      const veiculo = slug === 'video_aulas_praticas'
+        ? (practical === 'ligeiro' ? 'ligeiro' : 'pesado')
+        : practical
+      const category = categoriaDoDesbloqueio(slug, tier, veiculo)
+      const categoria = categoriaNomes[category] || category
+      if (slug === 'video_aulas_praticas') {
+        const veiculoNome = veiculo === 'ligeiro' ? 'Ligeiro' : 'Pesado'
+        return { titulo: `${nome} · ${veiculoNome}`, categoria }
+      }
+      if (isVideoSubcategoria(slug)) return { titulo: nome, categoria }
+      const pacote = tier === 'pro' ? 'Ultra Pro Max' : 'Pacote Básico'
+      return { titulo: `${nome} · ${pacote}`, categoria }
+    }
+
     const subscriptionLabel = (subscription) => {
       const slug = subscription && subscription.subcategoria
-      if (slug && subcategoriaNomes[slug]) return subcategoriaNomes[slug]
-      return (subscription && subscription.category) || 'Plano'
+      const practical = veiculoDaAssinatura(
+        subscription && subscription.practical,
+        subscription && subscription.category,
+      )
+      const resumo = resumoDoDesbloqueio(
+        slug,
+        subscription && (subscription.plano || (subscription.category === 'ganha-facil' ? 'pro' : 'basic')),
+        practical,
+      )
+      if (resumo) return resumo.titulo
+      const category = subscription && subscription.category
+      return categoriaNomes[category] || category || 'Plano'
     }
 
     const RECENT_SEARCHES_KEY = 'admin_users_recent_searches'
@@ -945,6 +1006,12 @@ export default {
         )
       },
     )
+
+    const resumoNovaAssinatura = computed(() => resumoDoDesbloqueio(
+      newSubscription.value.subcategoria,
+      newSubscription.value.plano,
+      newSubscription.value.practical,
+    ))
 
     const copyPassword = (password) => {
       if (!password) return
@@ -1279,7 +1346,12 @@ export default {
     const enterEditMode = () => {
       if (!clientData.value) return
 
-      const payments = clientData.value.payments ? [...clientData.value.payments] : []
+      const payments = (clientData.value.payments || []).map((payment) => {
+        const copy = { ...payment }
+        copy.practical = veiculoDaAssinatura(copy.practical, copy.category) || copy.practical || 'pesado'
+        if (!copy.plano) copy.plano = copy.category === 'ganha-facil' ? 'pro' : 'basic'
+        return copy
+      })
       editForm.value = {
         id: clientData.value.id,
         name: clientData.value.name,
@@ -1547,6 +1619,8 @@ export default {
       practicalOptions,
       isVideoSubcategoria,
       subscriptionLabel,
+      resumoDoDesbloqueio,
+      resumoNovaAssinatura,
       applySubcategoriaToSubscription,
       genderOptions,
       provinceOptions,
@@ -1623,6 +1697,15 @@ export default {
   .q-icon {
     font-size: 64px;
   }
+}
+
+.unlock-confirm {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #e8f5e9;
+  border-left: 4px solid #2e7d32;
+  color: #1b5e20;
+  line-height: 1.4;
 }
 
 .subscription-info {
