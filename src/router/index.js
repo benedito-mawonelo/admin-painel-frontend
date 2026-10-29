@@ -21,6 +21,7 @@ const routes = [
       { path: 'ranking', component: ranking },
       { path: 'videoManager', component: videoManager },
       { path: 'relatorios', component: () => import('src/pages/UsersNoPaymentsPage.vue') },
+      { path: 'pagamentos-activos', component: () => import('src/pages/ActivePaymentsUsersPage.vue') },
       { path: 'pagamentos-falhados', component: () => import('src/pages/FailedPaymentsPage.vue') },
       { path: 'versoes-app', component: () => import('src/pages/AppVersionsPage.vue') },
       { path: 'pagamentos-duplicados', component: () => import('src/pages/DuplicatePaymentsPage.vue') },

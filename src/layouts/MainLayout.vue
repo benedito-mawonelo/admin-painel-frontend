@@ -159,6 +159,15 @@
             </q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/pagamentos-activos" class="text-white">
+            <q-item-section avatar>
+              <q-icon name="how_to_reg" color="green-3" />
+            </q-item-section>
+            <q-item-section>
+              <div class="text-weight-medium">Utilizadores com pagamento activo</div>
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/angariadores-stats" class="text-white">
             <q-item-section avatar>
               <q-icon name="analytics" color="cyan-3" />
