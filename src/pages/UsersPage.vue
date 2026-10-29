@@ -818,7 +818,7 @@ export default {
 
     const subcategoriaDias = {
       exames_inatro: { basic: 20, pro: 40 },
-      material_basico: { basic: 25, pro: 50 },
+      material_basico: { basic: 25, pro: 60 },
       preparacao: { basic: 30, pro: 60 },
       pre_escola: { basic: 7, pro: 25 },
       profissional: { basic: 25, pro: 50 },
